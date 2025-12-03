@@ -37,7 +37,11 @@ pub mod procedures {
 ///
 /// This function routes the RPC call to the correct MOUNT procedure handler
 /// based on the procedure number.
-pub fn handle_mount_call(call: &rpc_call_msg, args_data: &[u8]) -> Result<BytesMut> {
+pub fn handle_mount_call(
+    call: &rpc_call_msg,
+    args_data: &[u8],
+    filesystem: &dyn crate::fsal::Filesystem,
+) -> Result<BytesMut> {
     debug!(
         "Dispatching MOUNT call: proc={}, prog={}, vers={}",
         call.proc_, call.prog, call.vers
@@ -74,7 +78,7 @@ pub fn handle_mount_call(call: &rpc_call_msg, args_data: &[u8]) -> Result<BytesM
         }
         procedures::MNT => {
             debug!("Routing to MOUNT MNT handler");
-            mnt::handle(call, args_data)
+            mnt::handle(call, args_data, filesystem)
         }
         procedures::UMNT => {
             debug!("Routing to MOUNT UMNT handler");

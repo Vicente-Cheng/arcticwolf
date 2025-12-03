@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::sync::Arc;
 use tracing_subscriber;
 
 mod fsal;
@@ -8,6 +9,7 @@ mod portmap;
 mod protocol;
 mod rpc;
 
+use fsal::BackendConfig;
 use protocol::v3::portmap::mapping;
 
 /// Register all RPC services in the portmapper registry
@@ -39,7 +41,6 @@ fn register_services(registry: &portmap::Registry, port: u32) {
     println!("  ✓ MOUNT v3 (TCP) on port {}", port);
 
     // Register NFS protocol (program 100003)
-    // Note: Not yet implemented, but registered for future use
     let nfs_tcp = mapping {
         prog: 100003,  // NFS
         vers: 3,       // NFSv3
@@ -47,7 +48,7 @@ fn register_services(registry: &portmap::Registry, port: u32) {
         port,
     };
     registry.set(&nfs_tcp);
-    println!("  ✓ NFS v3 (TCP) on port {} (not yet implemented)", port);
+    println!("  ✓ NFS v3 (TCP) on port {} (GETATTR implemented)", port);
 
     println!();
 }
@@ -64,9 +65,23 @@ async fn main() -> Result<()> {
     println!("- XDR: xdrgen + xdr-codec (supports string, union, arrays)");
     println!("- Protocol: v3 (RPC, MOUNT, NFS)");
     println!("- Middleware: Type-safe serialization/deserialization");
+    println!("- FSAL: File System Abstraction Layer");
     println!();
     println!("Starting RPC server on 0.0.0.0:4000");
-    println!("Phase 2.5: Portmapper + MOUNT protocol");
+    println!("Phase 3: NFS GETATTR implementation");
+    println!();
+
+    // Initialize FSAL (File System Abstraction Layer)
+    // Export /tmp/nfs_exports as the NFS export root
+    let export_path = std::path::PathBuf::from("/tmp/nfs_exports");
+    println!("Initializing FSAL:");
+    println!("  Export path: {}", export_path.display());
+
+    let fsal_config = BackendConfig::local(&export_path);
+    let filesystem: Arc<dyn fsal::Filesystem> = Arc::from(fsal_config.create_filesystem()?);
+
+    let root_handle = filesystem.root_handle();
+    println!("  Root handle: {} bytes", root_handle.len());
     println!();
 
     // Create portmapper registry
@@ -77,8 +92,8 @@ async fn main() -> Result<()> {
     // In production, these would be on different ports (111, 2049, 20048)
     register_services(&registry, 4000);
 
-    // Create and run RPC server
-    let server = rpc::server::RpcServer::new("0.0.0.0:4000".to_string(), registry);
+    // Create and run RPC server with filesystem
+    let server = rpc::server::RpcServer::new("0.0.0.0:4000".to_string(), registry, filesystem);
     server.run().await?;
 
     Ok(())

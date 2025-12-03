@@ -6,18 +6,25 @@ use anyhow::{anyhow, Result};
 use bytes::BytesMut;
 use tracing::{debug, warn};
 
+use crate::fsal::Filesystem;
 use crate::protocol::v3::rpc::rpc_call_msg;
 
-use super::null;
+use super::{access, fsinfo, fsstat, getattr, lookup, null, read};
 
 /// Dispatch NFS procedure call to appropriate handler
 ///
 /// # Arguments
 /// * `call` - Parsed RPC call message
+/// * `args_data` - Procedure arguments data
+/// * `filesystem` - Filesystem instance
 ///
 /// # Returns
 /// Serialized RPC reply message
-pub fn dispatch(call: &rpc_call_msg) -> Result<BytesMut> {
+pub fn dispatch(
+    call: &rpc_call_msg,
+    args_data: &[u8],
+    filesystem: &dyn Filesystem,
+) -> Result<BytesMut> {
     let procedure = call.proc_;
     let xid = call.xid;
 
@@ -40,18 +47,27 @@ pub fn dispatch(call: &rpc_call_msg) -> Result<BytesMut> {
         }
         1 => {
             // GETATTR - get file attributes
-            warn!("NFS GETATTR not yet implemented");
-            Err(anyhow!("GETATTR not implemented"))
+            getattr::handle_getattr(xid, args_data, filesystem)
         }
         3 => {
             // LOOKUP - lookup filename
-            warn!("NFS LOOKUP not yet implemented");
-            Err(anyhow!("LOOKUP not implemented"))
+            lookup::handle_lookup(xid, args_data, filesystem)
+        }
+        4 => {
+            // ACCESS - check file access permissions
+            access::handle_access(xid, args_data, filesystem)
         }
         6 => {
             // READ - read from file
-            warn!("NFS READ not yet implemented");
-            Err(anyhow!("READ not implemented"))
+            read::handle_read(xid, args_data, filesystem)
+        }
+        18 => {
+            // FSSTAT - get filesystem statistics
+            fsstat::handle_fsstat(xid, args_data, filesystem)
+        }
+        19 => {
+            // FSINFO - get filesystem information
+            fsinfo::handle_fsinfo(xid, args_data, filesystem)
         }
         7 => {
             // WRITE - write to file

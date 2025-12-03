@@ -165,6 +165,105 @@ union READ3res switch (nfsstat3 status) {
         READ3resfail resfail;
 };
 
+/* ===== ACCESS Procedure (4) ===== */
+
+const ACCESS3_READ    = 0x0001;
+const ACCESS3_LOOKUP  = 0x0002;
+const ACCESS3_MODIFY  = 0x0004;
+const ACCESS3_EXTEND  = 0x0008;
+const ACCESS3_DELETE  = 0x0010;
+const ACCESS3_EXECUTE = 0x0020;
+
+struct ACCESS3args {
+    fhandle3 object;
+    uint32 access;
+};
+
+struct ACCESS3resok {
+    fattr3 obj_attributes;
+    uint32 access;
+};
+
+struct ACCESS3resfail {
+    fattr3 obj_attributes;
+};
+
+union ACCESS3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        ACCESS3resok resok;
+    default:
+        ACCESS3resfail resfail;
+};
+
+/* ===== FSSTAT Procedure (18) ===== */
+
+struct FSSTAT3args {
+    fhandle3 fsroot;
+};
+
+struct FSSTAT3resok {
+    fattr3 obj_attributes;
+    uint64 tbytes;
+    uint64 fbytes;
+    uint64 abytes;
+    uint64 tfiles;
+    uint64 ffiles;
+    uint64 afiles;
+    uint32 invarsec;
+};
+
+struct FSSTAT3resfail {
+    fattr3 obj_attributes;
+};
+
+union FSSTAT3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        FSSTAT3resok resok;
+    default:
+        FSSTAT3resfail resfail;
+};
+
+/* ===== FSINFO Procedure (19) ===== */
+
+struct FSINFO3args {
+    fhandle3 fsroot;
+};
+
+/* NOTE: RFC 1813 specifies post_op_attr (optional attributes with bool discriminator)
+ * but xdrgen doesn't support bool discriminators. We handle this manually in Rust code.
+ * These structures use fattr3 as placeholder - actual serialization is done manually. */
+
+struct FSINFO3resok {
+    fattr3 obj_attributes;
+    uint32 rtmax;
+    uint32 rtpref;
+    uint32 rtmult;
+    uint32 wtmax;
+    uint32 wtpref;
+    uint32 wtmult;
+    uint32 dtpref;
+    uint64 maxfilesize;
+    nfstime3 time_delta;
+    uint32 properties;
+};
+
+struct FSINFO3resfail {
+    fattr3 obj_attributes;
+};
+
+union FSINFO3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        FSINFO3resok resok;
+    default:
+        FSINFO3resfail resfail;
+};
+
+/* FSINFO properties */
+const FSF3_LINK        = 0x0001;
+const FSF3_SYMLINK     = 0x0002;
+const FSF3_HOMOGENEOUS = 0x0008;
+const FSF3_CANSETTIME  = 0x0010;
+
 /* ===== NULL Procedure (0) ===== */
 /* Arguments: void */
 /* Results: void */

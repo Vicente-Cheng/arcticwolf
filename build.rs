@@ -48,7 +48,27 @@ fn main() {
         }
 
         // Write stdout to output file
-        fs::write(&output_path, &output.stdout)
+        let mut generated_code = String::from_utf8(output.stdout.clone())
+            .unwrap_or_else(|e| panic!("Invalid UTF-8 in generated code: {}", e));
+
+        // Fix Copy trait issue for union types with Box
+        // Remove Copy from enums that contain Box<T> in any variant
+        if spec_file == "nfs.x" {
+            generated_code = generated_code.replace(
+                "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum ACCESS3res",
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum ACCESS3res"
+            );
+            generated_code = generated_code.replace(
+                "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum FSINFO3res",
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum FSINFO3res"
+            );
+            generated_code = generated_code.replace(
+                "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum FSSTAT3res",
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum FSSTAT3res"
+            );
+        }
+
+        fs::write(&output_path, generated_code.as_bytes())
             .unwrap_or_else(|e| panic!("Failed to write {}: {}", output_path.display(), e));
 
         println!("cargo:warning=Generated {} from {}", output_file, spec_file);

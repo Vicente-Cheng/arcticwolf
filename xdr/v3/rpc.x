@@ -86,7 +86,8 @@ struct call_body {
 
 struct rpc_call_msg {
     unsigned int xid;
-    unsigned int rpcvers;
+    msg_type mtype;          /* Must be CALL (0) */
+    unsigned int rpcvers;    /* Must be 2 */
     unsigned int prog;
     unsigned int vers;
     unsigned int proc;
@@ -130,6 +131,7 @@ struct rejected_reply_auth {
  */
 struct rpc_reply_msg {
     unsigned int xid;
+    msg_type mtype;            /* Must be REPLY (1) */
     reply_stat stat;           /* MSG_ACCEPTED or MSG_DENIED */
     opaque_auth verf;          /* Verifier (for MSG_ACCEPTED) */
     accept_stat accept_stat;   /* Accept status (for MSG_ACCEPTED with SUCCESS) */

@@ -38,6 +38,7 @@ impl RpcMessage {
     pub fn create_null_reply(xid: u32) -> rpc_reply_msg {
         rpc_reply_msg {
             xid,
+            mtype: msg_type::REPLY,
             stat: reply_stat::MSG_ACCEPTED,
             verf: opaque_auth {
                 flavor: auth_flavor::AUTH_NONE,
@@ -45,5 +46,36 @@ impl RpcMessage {
             },
             accept_stat: accept_stat::SUCCESS,
         }
+    }
+
+    /// Create a successful reply with procedure result data
+    ///
+    /// Combines RPC reply header with procedure-specific result data
+    pub fn create_success_reply_with_data(xid: u32, proc_data: BytesMut) -> Result<BytesMut> {
+        // Create RPC reply header
+        let rpc_reply = Self::create_null_reply(xid);
+        let rpc_header = Self::serialize_reply(&rpc_reply)?;
+
+        // Combine RPC header + procedure result data
+        let mut response = BytesMut::with_capacity(rpc_header.len() + proc_data.len());
+        response.extend_from_slice(&rpc_header);
+        response.extend_from_slice(&proc_data);
+
+        Ok(response)
+    }
+
+    /// Create an RPC error reply for unsupported programs
+    pub fn create_prog_unavail_reply(xid: u32) -> Result<BytesMut> {
+        let rpc_reply = rpc_reply_msg {
+            xid,
+            mtype: msg_type::REPLY,
+            stat: reply_stat::MSG_ACCEPTED,
+            verf: opaque_auth {
+                flavor: auth_flavor::AUTH_NONE,
+                body: vec![],
+            },
+            accept_stat: accept_stat::PROG_UNAVAIL,
+        };
+        Self::serialize_reply(&rpc_reply)
     }
 }

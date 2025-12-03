@@ -4,10 +4,12 @@
 
 use anyhow::{anyhow, Result};
 use bytes::{Buf, BufMut, BytesMut};
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tracing::{debug, error, info, warn};
 
+use crate::fsal::Filesystem;
 use crate::portmap::Registry;
 use crate::protocol::v3::rpc::{rpc_call_msg, RpcMessage};
 
@@ -15,11 +17,16 @@ use crate::protocol::v3::rpc::{rpc_call_msg, RpcMessage};
 pub struct RpcServer {
     addr: String,
     registry: Registry,
+    filesystem: Arc<dyn Filesystem>,
 }
 
 impl RpcServer {
-    pub fn new(addr: String, registry: Registry) -> Self {
-        Self { addr, registry }
+    pub fn new(addr: String, registry: Registry, filesystem: Arc<dyn Filesystem>) -> Self {
+        Self {
+            addr,
+            registry,
+            filesystem,
+        }
     }
 
     pub async fn run(&self) -> Result<()> {
@@ -31,8 +38,9 @@ impl RpcServer {
             info!("New connection from {}", peer_addr);
 
             let registry = self.registry.clone();
+            let filesystem = self.filesystem.clone();
             tokio::spawn(async move {
-                if let Err(e) = handle_connection(socket, registry).await {
+                if let Err(e) = handle_connection(socket, registry, filesystem).await {
                     error!("Connection error from {}: {}", peer_addr, e);
                 }
             });
@@ -41,7 +49,11 @@ impl RpcServer {
 }
 
 /// Handle a single TCP connection
-async fn handle_connection(mut socket: TcpStream, registry: Registry) -> Result<()> {
+async fn handle_connection(
+    mut socket: TcpStream,
+    registry: Registry,
+    filesystem: Arc<dyn Filesystem>,
+) -> Result<()> {
     let mut buffer = BytesMut::with_capacity(8192);
 
     loop {
@@ -73,23 +85,48 @@ async fn handle_connection(mut socket: TcpStream, registry: Registry) -> Result<
         if is_last {
             debug!("Complete RPC message received ({} bytes)", buffer.len());
 
-            match handle_rpc_message(&buffer, &registry).await {
-                Ok(response) => {
-                    // Send response with record marking
-                    let response_len = response.len() as u32;
-                    let record_header = response_len | 0x80000000; // Set last fragment bit
-
-                    socket.write_u32(record_header).await?;
-                    socket.write_all(&response).await?;
-                    socket.flush().await?;
-
-                    debug!("Sent response ({} bytes)", response.len());
-                }
+            let response = match handle_rpc_message(&buffer, &registry, filesystem.as_ref()) {
+                Ok(response) => response,
                 Err(e) => {
                     error!("Failed to handle RPC message: {}", e);
-                    // TODO: Send error response
+
+                    // Try to parse XID from buffer to send proper error response
+                    if buffer.len() >= 4 {
+                        let xid = u32::from_be_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]);
+
+                        // Send PROG_UNAVAIL error response
+                        match RpcMessage::create_prog_unavail_reply(xid) {
+                            Ok(error_response) => {
+                                warn!("Sending PROG_UNAVAIL error response for xid={}", xid);
+                                error_response
+                            }
+                            Err(serialize_err) => {
+                                error!("Failed to create error response: {}", serialize_err);
+                                continue; // Skip this message and wait for next one
+                            }
+                        }
+                    } else {
+                        error!("Buffer too short to extract XID");
+                        continue; // Skip this message and wait for next one
+                    }
                 }
-            }
+            };
+
+            // Send response with record marking
+            // IMPORTANT: Record mark and payload must be sent in a single write()
+            // to avoid TCP fragmentation causing client parsing issues
+            let response_len = response.len() as u32;
+            let record_header = response_len | 0x80000000; // Set last fragment bit
+
+            // Combine record mark + payload into single buffer
+            let mut full_response = Vec::with_capacity(4 + response.len());
+            full_response.extend_from_slice(&record_header.to_be_bytes());
+            full_response.extend_from_slice(&response);
+
+            socket.write_all(&full_response).await?;
+            socket.flush().await?;
+
+            debug!("Sent response ({} bytes)", response.len());
 
             // Clear buffer for next message
             buffer.clear();
@@ -100,7 +137,18 @@ async fn handle_connection(mut socket: TcpStream, registry: Registry) -> Result<
 }
 
 /// Handle a complete RPC message
-async fn handle_rpc_message(data: &[u8], registry: &Registry) -> Result<BytesMut> {
+fn handle_rpc_message(
+    data: &[u8],
+    registry: &Registry,
+    filesystem: &dyn Filesystem,
+) -> Result<BytesMut> {
+    // Debug: dump complete RPC message
+    debug!(
+        "Complete RPC message ({} bytes): {:02x?}",
+        data.len(),
+        &data[..data.len().min(100)]
+    );
+
     // Deserialize RPC call header
     let call = RpcMessage::deserialize_call(data)?;
 
@@ -110,10 +158,44 @@ async fn handle_rpc_message(data: &[u8], registry: &Registry) -> Result<BytesMut
     );
 
     // Calculate where procedure arguments start (after RPC call header)
-    // RPC call header size: xid(4) + rpcvers(4) + prog(4) + vers(4) + proc(4) + cred + verf
-    // For AUTH_NONE: cred(4+4) + verf(4+4) = 16 bytes
-    // Total: 20 + 16 = 36 bytes for NULL auth
-    let args_offset = 36; // TODO: Parse cred/verf length dynamically
+    // RPC call header: xid(4) + mtype(4) + rpcvers(4) + prog(4) + vers(4) + proc(4) = 24 bytes
+    // Then: opaque_auth cred + opaque_auth verf (variable length)
+    // opaque_auth = flavor(4) + length(4) + body(length bytes, padded to 4-byte boundary)
+
+    let mut offset = 24; // After fixed RPC header fields
+
+    // Parse credential (opaque_auth)
+    if data.len() < offset + 8 {
+        return Err(anyhow!("RPC message too short for credential header"));
+    }
+    let cred_length = u32::from_be_bytes([
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
+    ]) as usize;
+    let cred_padded = (cred_length + 3) & !3; // Round up to multiple of 4
+    offset += 8 + cred_padded; // flavor(4) + length(4) + body(padded)
+
+    debug!("Credential length: {} bytes (padded: {}), offset now: {}", cred_length, cred_padded, offset);
+
+    // Parse verifier (opaque_auth)
+    if data.len() < offset + 8 {
+        return Err(anyhow!("RPC message too short for verifier header"));
+    }
+    let verf_length = u32::from_be_bytes([
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
+    ]) as usize;
+    let verf_padded = (verf_length + 3) & !3; // Round up to multiple of 4
+    offset += 8 + verf_padded; // flavor(4) + length(4) + body(padded)
+
+    debug!("Verifier length: {} bytes (padded: {}), offset now: {}", verf_length, verf_padded, offset);
+
+    // Now offset points to the procedure arguments
+    let args_offset = offset;
     let args_data = if data.len() > args_offset {
         &data[args_offset..]
     } else {
@@ -130,12 +212,12 @@ async fn handle_rpc_message(data: &[u8], registry: &Registry) -> Result<BytesMut
         100005 => {
             // MOUNT protocol (program 100005)
             debug!("Routing to MOUNT protocol handler");
-            crate::mount::handle_mount_call(&call, args_data)
+            crate::mount::handle_mount_call(&call, args_data, filesystem)
         }
         100003 => {
             // NFS protocol (program 100003)
             debug!("Routing to NFS protocol handler");
-            crate::nfs::dispatch(&call)
+            crate::nfs::dispatch(&call, args_data, filesystem)
         }
         _ => {
             warn!("Unknown program number: {}", call.prog);
