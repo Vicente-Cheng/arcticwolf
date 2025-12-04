@@ -2,7 +2,7 @@
 
 ## Overview
 
-Arctic Wolf is an NFS (Network File System) server implementation in Rust, providing NFSv3 and MOUNT protocol support with a clean, layered architecture inspired by [NFS-Ganesha](https://github.com/nfs-ganesha/nfs-ganesha).
+Arctic Wolf is an NFSv3 server implementation in Rust, providing NFSv3 and MOUNT protocol support with a clean, layered architecture inspired by [NFS-Ganesha](https://github.com/nfs-ganesha/nfs-ganesha).
 
 ## Design Principles
 
@@ -16,57 +16,83 @@ Arctic Wolf is an NFS (Network File System) server implementation in Rust, provi
 
 ```
 arcticwolf/
-├── xdr/                        # XDR Protocol Specifications (inspired by nfs-ganesha/Protocols/XDR)
-│   ├── v3/                     # NFSv3 and related protocols
-│   │   ├── rpc.x              # RPC protocol (RFC 5531)
-│   │   ├── mount.x            # MOUNT protocol (RFC 1813)
-│   │   └── nfs.x              # NFSv3 protocol (RFC 1813)
-│   └── v4/                     # NFSv4 (future)
-│       └── nfs.x
+├── xdr/                        # XDR Protocol Specifications
+│   └── v3/                     # NFSv3 and related protocols
+│       ├── rpc.x               # RPC protocol (RFC 5531)
+│       ├── portmap.x           # PORTMAP protocol
+│       ├── mount.x             # MOUNT protocol (RFC 1813)
+│       └── nfs.x               # NFSv3 protocol (RFC 1813)
 │
 ├── src/
-│   ├── protocol/              # Protocol Middleware Layer
+│   ├── protocol/               # Protocol Middleware Layer
 │   │   ├── mod.rs
 │   │   └── v3/
 │   │       ├── mod.rs
-│   │       ├── rpc.rs         # RPC type wrappers + serialization helpers
-│   │       ├── mount.rs       # MOUNT type wrappers + helpers
-│   │       └── nfs.rs         # NFS type wrappers + helpers
+│   │       ├── rpc.rs          # RPC type wrappers + helpers
+│   │       ├── portmap.rs      # PORTMAP helpers
+│   │       ├── mount.rs        # MOUNT type wrappers + helpers
+│   │       └── nfs.rs          # NFS type wrappers + helpers
 │   │
-│   ├── rpc/                   # RPC Implementation Layer
+│   ├── rpc/                    # RPC Implementation Layer
 │   │   ├── mod.rs
-│   │   └── server.rs          # TCP server + record marking (RFC 5531)
+│   │   └── server.rs           # TCP server + record marking (RFC 5531)
 │   │
-│   ├── mount/                 # MOUNT Protocol Handlers (future)
+│   ├── portmap/                # PORTMAP Protocol Handlers
 │   │   ├── mod.rs
-│   │   ├── null.rs            # MOUNT NULL procedure
-│   │   ├── mnt.rs             # MOUNT MNT procedure
-│   │   └── umnt.rs            # MOUNT UMNT procedure
+│   │   ├── dispatcher.rs       # Route PORTMAP procedures
+│   │   ├── null.rs             # PORTMAP NULL
+│   │   ├── getport.rs          # PORTMAP GETPORT
+│   │   └── dump.rs             # PORTMAP DUMP
 │   │
-│   ├── nfs/                   # NFS Protocol Handlers (future)
+│   ├── mount/                  # MOUNT Protocol Handlers
 │   │   ├── mod.rs
-│   │   └── v3/
-│   │       ├── mod.rs
-│   │       ├── null.rs        # NFS NULL procedure
-│   │       ├── getattr.rs     # GETATTR operation
-│   │       ├── setattr.rs     # SETATTR operation
-│   │       ├── lookup.rs      # LOOKUP operation
-│   │       ├── read.rs        # READ operation
-│   │       └── write.rs       # WRITE operation
+│   │   ├── dispatcher.rs       # Route MOUNT procedures
+│   │   ├── null.rs             # MOUNT NULL procedure
+│   │   ├── mnt.rs              # MOUNT MNT procedure
+│   │   ├── umnt.rs             # MOUNT UMNT procedure
+│   │   └── export.rs           # MOUNT EXPORT procedure
 │   │
-│   ├── fsal/                  # Filesystem Abstraction Layer (future)
+│   ├── nfs/                    # NFS Protocol Handlers
 │   │   ├── mod.rs
-│   │   └── local.rs           # Local filesystem backend
+│   │   ├── dispatcher.rs       # Route NFS procedures
+│   │   ├── null.rs             # NFS NULL (proc 0)
+│   │   ├── getattr.rs          # GETATTR (proc 1)
+│   │   ├── setattr.rs          # SETATTR (proc 2)
+│   │   ├── lookup.rs           # LOOKUP (proc 3)
+│   │   ├── access.rs           # ACCESS (proc 4)
+│   │   ├── read.rs             # READ (proc 6)
+│   │   ├── write.rs            # WRITE (proc 7)
+│   │   ├── create.rs           # CREATE (proc 8)
+│   │   ├── readdir.rs          # READDIR (proc 16)
+│   │   ├── fsstat.rs           # FSSTAT (proc 18)
+│   │   ├── fsinfo.rs           # FSINFO (proc 19)
+│   │   └── pathconf.rs         # PATHCONF (proc 20)
 │   │
-│   └── main.rs                # Server entry point
+│   ├── fsal/                   # Filesystem Abstraction Layer
+│   │   ├── mod.rs              # FSAL trait definition
+│   │   └── local.rs            # Local filesystem backend
+│   │
+│   └── main.rs                 # Server entry point
 │
-├── build.rs                   # XDR code generation (xdrgen)
-├── Cargo.toml                 # Dependencies
-├── Earthfile                  # Containerized build
-├── tests/                     # Integration tests
-│   ├── test_rpc_null.py      # RPC NULL test
-│   └── README.md
-└── ARCHITECTURE.md            # This file
+├── tests/                      # Integration tests
+│   ├── test_rpc_null.py        # RPC NULL test
+│   ├── test_portmap.py         # PORTMAP tests
+│   ├── test_mount_null.py      # MOUNT NULL test
+│   ├── test_mount.py           # MOUNT protocol tests
+│   ├── test_nfs_null.py        # NFS NULL test
+│   ├── test_nfs_getattr.py     # GETATTR tests
+│   ├── test_nfs_lookup.py      # LOOKUP tests
+│   ├── test_nfs_read.py        # READ tests
+│   ├── test_nfs_write.py       # WRITE tests
+│   ├── test_nfs_create.py      # CREATE tests
+│   ├── test_nfs_setattr.py     # SETATTR tests
+│   └── test_nfs_readdir.py     # READDIR tests
+│
+├── build.rs                    # XDR code generation (xdrgen)
+├── Cargo.toml                  # Dependencies
+├── Earthfile                   # Containerized build
+├── TODO.md                     # Planned improvements
+└── ARCHITECTURE.md             # This file
 ```
 
 ## Architecture Layers
@@ -81,22 +107,58 @@ arcticwolf/
 - Machine-readable, generates Rust code
 - Single source of truth for protocol types
 
-**Example** (`xdr/v3/rpc.x`):
+**Critical Design Note - XDR Unions**:
+XDR supports two distinct data structures that are often confused:
+
+1. **Struct** - Always serializes all fields:
 ```xdr
-struct rpc_call_msg {
-    unsigned int xid;
-    unsigned int rpcvers;
-    unsigned int prog;
-    unsigned int vers;
-    unsigned int proc;
-    opaque_auth cred;
-    opaque_auth verf;
+struct set_mode3 {
+    bool set_it;
+    uint32 mode;
+};
+// Always 8 bytes: set_it (4) + mode (4)
+```
+
+2. **Union** - Only serializes discriminator + value when needed:
+```xdr
+union set_mode3 switch (set_mode3_how set_it) {
+    case SET_MODE:
+        uint32 mode;
+    default:
+        void;
+};
+// 4 bytes when DONT_SET, 8 bytes when SET_MODE
+```
+
+**Our Implementation**: We use **unions** for optional attributes (set_mode3, set_uid3, set_gid3, set_size3) to match Linux NFS client behavior and RFC 1813 semantics. This was a critical fix - initial struct implementation caused "failed to fill whole buffer" errors with real NFS clients.
+
+**Example** (`xdr/v3/nfs.x`):
+```xdr
+enum set_mode3_how {
+    DONT_SET_MODE = 0,
+    SET_MODE = 1
+};
+
+union set_mode3 switch (set_mode3_how set_it) {
+    case SET_MODE:
+        uint32 mode;
+    default:
+        void;
+};
+
+struct sattr3 {
+    set_mode3 mode;
+    set_uid3 uid;
+    set_gid3 gid;
+    set_size3 size;
+    set_atime atime;
+    set_mtime mtime;
 };
 ```
 
 **Build Process**:
 ```
-xdr/v3/rpc.x → (xdrgen) → target/.../rpc_generated.rs
+xdr/v3/*.x → (xdrgen) → target/.../[protocol]_generated.rs
 ```
 
 ### Layer 2: Protocol Middleware (`src/protocol/`)
@@ -109,45 +171,49 @@ xdr/v3/rpc.x → (xdrgen) → target/.../rpc_generated.rs
 - Offer convenience constructors for responses
 - Re-export types for use by upper layers
 
-**Example** (`src/protocol/v3/rpc.rs`):
+**Example** (`src/protocol/v3/nfs.rs`):
 ```rust
-pub struct RpcMessage;
+pub struct NfsMessage;
 
-impl RpcMessage {
-    // Deserialize RPC call from bytes
-    pub fn deserialize_call(data: &[u8]) -> Result<rpc_call_msg> {
-        let (msg, _) = rpc_call_msg::unpack(&mut Cursor::new(data))?;
-        Ok(msg)
+impl NfsMessage {
+    // Deserialize NFS GETATTR args
+    pub fn deserialize_getattr3args(data: &[u8]) -> Result<GETATTR3args> {
+        let (args, _) = GETATTR3args::unpack(&mut Cursor::new(data))?;
+        Ok(args)
     }
 
-    // Serialize RPC reply to bytes
-    pub fn serialize_reply(reply: &rpc_reply_msg) -> Result<BytesMut> {
+    // Create GETATTR success response
+    pub fn create_getattr_response(attrs: &fattr3) -> Result<BytesMut> {
+        let res = GETATTR3res::NFS3_OK(GETATTR3resok {
+            obj_attributes: *attrs,
+        });
         let mut buf = Vec::new();
-        reply.pack(&mut buf)?;
+        res.pack(&mut buf)?;
         Ok(BytesMut::from(&buf[..]))
     }
 
-    // Create a successful NULL reply
-    pub fn create_null_reply(xid: u32) -> rpc_reply_msg {
-        // ...
+    // Convert FSAL attributes to NFS format
+    pub fn fsal_to_fattr3(attrs: &FileAttributes) -> fattr3 {
+        // Conversion logic
     }
 }
 ```
 
 **Key Features**:
-- Type-safe wrappers
+- Type-safe wrappers around generated XDR code
 - Automatic serialization via `xdr-codec` traits (`Pack`/`Unpack`)
 - Convenience methods for common operations
+- FSAL ↔ NFS attribute conversions
 
 ### Layer 3: RPC Implementation (`src/rpc/`)
 
 **Purpose**: TCP server handling and RPC record marking protocol.
 
 **Responsibilities**:
-- Accept TCP connections
+- Accept TCP connections on port 4000
 - Handle RPC record marking (RFC 5531 §11)
 - Parse RPC messages
-- Route to procedure handlers
+- Route to protocol dispatchers (PORTMAP, MOUNT, NFS)
 - Send formatted responses
 
 **Record Marking Protocol**:
@@ -165,89 +231,233 @@ async fn handle_connection(mut socket: TcpStream) -> Result<()> {
         let fragment_len = (header_u32 & 0x7FFFFFFF) as usize;
 
         // Read fragment
-        // Process complete RPC message if last fragment
-        // Route to handler
-        // Send response
+        let mut fragment = vec![0u8; fragment_len];
+        socket.read_exact(&mut fragment).await?;
+
+        // Assemble complete message
+        message.extend_from_slice(&fragment);
+
+        if is_last {
+            // Process complete RPC message
+            let reply = dispatch_rpc_message(&message).await?;
+
+            // Send response with record marking
+            let reply_len = reply.len() as u32;
+            let header = 0x80000000 | reply_len;
+            socket.write_u32(header).await?;
+            socket.write_all(&reply).await?;
+
+            message.clear();
+        }
     }
 }
 ```
 
-### Layer 4: Protocol Handlers (`src/mount/`, `src/nfs/`)
+### Layer 4: Protocol Dispatchers
+
+**Purpose**: Route RPC calls to appropriate protocol handlers based on program and procedure numbers.
+
+**Dispatchers**:
+- `portmap::dispatcher` - Program 100000
+- `mount::dispatcher` - Program 100005
+- `nfs::dispatcher` - Program 100003
+
+**Example** (`src/nfs/dispatcher.rs`):
+```rust
+pub async fn dispatch(
+    xid: u32,
+    proc: u32,
+    args_data: &[u8],
+    filesystem: &dyn Filesystem,
+) -> Result<BytesMut> {
+    match proc {
+        0 => null::handle_null(xid),
+        1 => getattr::handle_getattr(xid, args_data, filesystem),
+        2 => setattr::handle_setattr(xid, args_data, filesystem),
+        3 => lookup::handle_lookup(xid, args_data, filesystem),
+        4 => access::handle_access(xid, args_data, filesystem),
+        6 => read::handle_read(xid, args_data, filesystem),
+        7 => write::handle_write(xid, args_data, filesystem),
+        8 => create::handle_create(xid, args_data, filesystem),
+        16 => readdir::handle_readdir(xid, args_data, filesystem),
+        18 => fsstat::handle_fsstat(xid, args_data, filesystem),
+        19 => fsinfo::handle_fsinfo(xid, args_data, filesystem),
+        20 => pathconf::handle_pathconf(xid, args_data, filesystem),
+        _ => Err(anyhow!("Unknown NFS procedure: {}", proc)),
+    }
+}
+```
+
+### Layer 5: Protocol Handlers (`src/portmap/`, `src/mount/`, `src/nfs/`)
 
 **Purpose**: Business logic for individual protocol operations.
 
 **Design**: One operation per file (following nfs-ganesha pattern).
 
-**Example Structure** (future implementation):
+**Example** (`src/nfs/getattr.rs`):
 ```rust
-// src/nfs/v3/getattr.rs
-pub async fn handle_getattr(args: GETATTR3args) -> Result<GETATTR3res> {
-    // 1. Validate file handle
+pub fn handle_getattr(
+    xid: u32,
+    args_data: &[u8],
+    filesystem: &dyn Filesystem,
+) -> Result<BytesMut> {
+    // 1. Deserialize arguments
+    let args = NfsMessage::deserialize_getattr3args(args_data)?;
+
     // 2. Call FSAL to get attributes
+    let attrs = filesystem.getattr(&args.object.0)?;
+
     // 3. Convert FSAL attributes to NFS format
-    // 4. Return response
+    let nfs_attrs = NfsMessage::fsal_to_fattr3(&attrs);
+
+    // 4. Create and serialize response
+    let res_data = NfsMessage::create_getattr_response(&nfs_attrs)?;
+
+    // 5. Wrap in RPC reply
+    RpcMessage::create_success_reply_with_data(xid, res_data)
 }
 ```
 
-### Layer 5: Filesystem Abstraction (`src/fsal/`)
+**Handler Patterns**:
+- Deserialize args using protocol middleware
+- Validate inputs
+- Call FSAL operations
+- Convert results to protocol types
+- Create response message
+- Handle errors with appropriate NFS error codes
 
-**Purpose**: Abstract different filesystem backends.
+### Layer 6: Filesystem Abstraction (`src/fsal/`)
 
-**Future Implementation**:
-- `fsal/local.rs`: Local filesystem operations
-- `fsal/memory.rs`: In-memory filesystem (testing)
-- `fsal/s3.rs`: S3 backend
-- Common trait for all backends
+**Purpose**: Abstract different filesystem backends behind a common interface.
+
+**FSAL Trait**:
+```rust
+pub trait Filesystem: Send + Sync {
+    // File handle operations
+    fn root_handle(&self) -> FileHandle;
+
+    // Metadata operations
+    fn getattr(&self, handle: &FileHandle) -> Result<FileAttributes>;
+    fn setattr_size(&self, handle: &FileHandle, size: u64) -> Result<()>;
+    fn setattr_mode(&self, handle: &FileHandle, mode: u32) -> Result<()>;
+    fn setattr_owner(&self, handle: &FileHandle, uid: Option<u32>, gid: Option<u32>) -> Result<()>;
+
+    // Lookup and navigation
+    fn lookup(&self, dir_handle: &FileHandle, name: &str) -> Result<FileHandle>;
+
+    // Data operations
+    fn read(&self, handle: &FileHandle, offset: u64, count: u32) -> Result<Vec<u8>>;
+    fn write(&self, handle: &FileHandle, offset: u64, data: &[u8]) -> Result<u32>;
+
+    // Directory operations
+    fn readdir(&self, dir_handle: &FileHandle, cookie: u64, count: u32)
+        -> Result<Vec<DirEntry>>;
+
+    // File creation
+    fn create(&self, dir_handle: &FileHandle, name: &str, mode: u32)
+        -> Result<FileHandle>;
+
+    // Filesystem info
+    fn fsstat(&self) -> Result<FsStats>;
+    fn fsinfo(&self) -> FsInfo;
+    fn pathconf(&self) -> PathConf;
+}
+```
+
+**Current Implementation**:
+- `local.rs`: Local filesystem backend using std::fs
+
+**Future Backends**:
+- `memory.rs`: In-memory filesystem (testing)
+- `s3.rs`: S3-backed filesystem
+- Custom backends for specific use cases
 
 ## Data Flow
 
-### RPC NULL Call Example
+### Complete NFS Operation Flow
 
 ```
-Client
+Linux NFS Client
   ↓ TCP (port 4000)
-[RPC Server: server.rs]
+[RPC Server: src/rpc/server.rs]
   ↓ Read record marking
-  ↓ Parse RPC message
-[Protocol Middleware: protocol::v3::rpc]
-  ↓ Deserialize call (xdr-codec::Unpack)
-  ↓ rpc_call_msg { xid, prog, proc, ... }
-[Handler: handle_null_procedure]
-  ↓ Create reply
-  ↓ rpc_reply_msg { xid, stat: MSG_ACCEPTED, ... }
-[Protocol Middleware]
-  ↓ Serialize reply (xdr-codec::Pack)
-[RPC Server]
-  ↓ Add record marking
-  ↓ Send TCP response
-Client
-```
-
-### Future MOUNT/NFS Call Flow
-
-```
-Client
-  ↓
-[RPC Server]
-  ↓ Parse RPC call
+  ↓ Parse RPC header (program, version, procedure)
   ↓ Route by program number
-[Dispatcher]
-  ├── prog=100005 → [MOUNT Handler]
-  │   ├── proc=0 → mount::null()
-  │   ├── proc=1 → mount::mnt()
-  │   └── proc=3 → mount::umnt()
-  │
-  └── prog=100003 → [NFS Handler]
-      ├── proc=0 → nfs::v3::null()
-      ├── proc=1 → nfs::v3::getattr()
-      ├── proc=3 → nfs::v3::lookup()
-      ├── proc=6 → nfs::v3::read()
-      └── proc=7 → nfs::v3::write()
-          ↓
-      [FSAL: Filesystem Abstraction]
-          ↓
-      [Local Filesystem / S3 / Memory]
+  ├─ 100000 → [PORTMAP Dispatcher]
+  ├─ 100005 → [MOUNT Dispatcher]
+  └─ 100003 → [NFS Dispatcher]
+              ↓ Route by procedure
+              ├─ proc=0 → null.rs
+              ├─ proc=1 → getattr.rs
+              ├─ proc=3 → lookup.rs
+              ├─ proc=6 → read.rs
+              └─ proc=7 → write.rs
+                  ↓
+              [Protocol Middleware: protocol::v3::nfs]
+                  ↓ Deserialize WRITE3args
+                  ↓ { file: fhandle3, offset, count, data }
+              [FSAL: Filesystem trait]
+                  ↓ write(handle, offset, data)
+              [Local Backend: fsal::local]
+                  ↓ std::fs operations
+              [Response Path]
+                  ↓ FSAL returns bytes_written
+                  ↓ Handler creates WRITE3res
+                  ↓ Middleware serializes response
+                  ↓ RPC server adds record marking
+                  ↓ Send to client
+Linux NFS Client
 ```
+
+### NFS WRITE Example (Detailed)
+
+1. **Client Request**:
+   - Client: `echo "test" > /mnt/nfs/file.txt`
+   - Generates: SETATTR (truncate) + WRITE calls
+
+2. **SETATTR Call**:
+   ```
+   RPC Header: prog=100003, vers=3, proc=2
+   SETATTR3args:
+     file: fhandle3 (32 bytes)
+     new_attributes: sattr3 {
+       mode: DONT_SET_MODE
+       uid: DONT_SET_UID
+       gid: DONT_SET_GID
+       size: SET_SIZE(0)  // Truncate to 0
+       atime: DONT_CHANGE
+       mtime: DONT_CHANGE
+     }
+   ```
+
+3. **Server Processing**:
+   ```
+   nfs::dispatcher → setattr::handle_setattr
+     → NfsMessage::deserialize_setattr3args
+     → filesystem.setattr_size(handle, 0)
+     → LocalFilesystem uses std::fs::File::set_len(0)
+     → Return SETATTR3res::NFS3_OK
+   ```
+
+4. **WRITE Call**:
+   ```
+   RPC Header: prog=100003, vers=3, proc=7
+   WRITE3args:
+     file: fhandle3
+     offset: 0
+     count: 5
+     stable: FILE_SYNC
+     data: b"test\n"
+   ```
+
+5. **Server Processing**:
+   ```
+   nfs::dispatcher → write::handle_write
+     → NfsMessage::deserialize_write3args
+     → filesystem.write(handle, 0, b"test\n")
+     → LocalFilesystem uses std::fs::File::write_at
+     → Return WRITE3res::NFS3_OK { count: 5, committed: FILE_SYNC }
+   ```
 
 ## Technology Stack
 
@@ -265,105 +475,73 @@ Client
 ### Build Tools
 
 - **xdrgen**: CLI tool for XDR→Rust code generation (installed via `cargo install xdrgen`)
-- **build.rs**: Runs xdrgen during compilation
+- **build.rs**: Runs xdrgen during compilation, applies Copy trait fixes
 - **Earthly**: Containerized builds for reproducibility
-
-## XDR Code Generation
-
-### Process
-
-1. Developer writes/modifies `.x` files in `xdr/v3/`
-2. `build.rs` runs `xdrgen` for each `.x` file
-3. Generated Rust code → `target/.../[protocol]_generated.rs`
-4. Protocol middleware includes generated code via `include!()` macro
-5. Upper layers use types through middleware exports
-
-### Example Generation
-
-**Input** (`xdr/v3/mount.x`):
-```xdr
-typedef string dirpath<MNTPATHLEN>;
-typedef opaque fhandle3<FHSIZE3>;
-
-enum mountstat3 {
-    MNT3_OK = 0,
-    MNT3ERR_PERM = 1,
-    // ...
-};
-
-union mountres3 switch (mountstat3 fhs_status) {
-    case MNT3_OK:
-        mountres3_ok mountinfo;
-    default:
-        void;
-};
-```
-
-**Output** (generated Rust):
-```rust
-pub struct dirpath(pub String);
-pub struct fhandle3(pub Vec<u8>);
-
-pub enum mountstat3 {
-    MNT3_OK = 0,
-    MNT3ERR_PERM = 1,
-    // ...
-}
-
-pub enum mountres3 {
-    MNT3_OK(mountres3_ok),
-    default,
-}
-
-impl Pack for mountres3 { ... }
-impl Unpack for mountres3 { ... }
-```
-
-### Why xdrgen + xdr-codec?
-
-**Advantages over alternatives**:
-- ✅ **Full XDR Support**: `string`, `union`, variable-length arrays
-- ✅ **Automatic Serialization**: `Pack`/`Unpack` traits generated
-- ✅ **RFC Compliant**: Follows RFC 4506 (XDR) and RFC 5531 (RPC)
-- ✅ **Active Maintenance**: Used by Stellar project
-- ✅ **Rust Idiomatic**: Generates standard Rust types
-
-**Previous Attempt**: `fastxdr`
-- ❌ Limited `string` support
-- ❌ No `union` support
-- ❌ Incomplete variable-length arrays
-- ✅ Manual serialization required
 
 ## Protocol Support
 
-### Current Implementation
+### Current Implementation Status
 
-| Protocol | Version | RFC | Status | Port |
-|----------|---------|-----|--------|------|
-| RPC | 2 | RFC 5531 | ✅ NULL procedure | - |
-| MOUNT | 3 | RFC 1813 | 🚧 In progress | - |
-| NFS | 3 | RFC 1813 | 🚧 Planned | - |
+| Protocol | Version | RFC | Port | Status |
+|----------|---------|-----|------|--------|
+| RPC | 2 | RFC 5531 | - | ✅ Complete |
+| PORTMAP | 2 | RFC 1833 | - | ✅ Complete |
+| MOUNT | 3 | RFC 1813 | - | ✅ Complete |
+| NFS | 3 | RFC 1813 | 4000 | 🔧 12/22 procedures |
 
-### Procedure Support
+### Procedure Implementation
 
-#### RPC (Program 100000)
-- [x] NULL (0) - Ping test
+#### RPC (Program 100000) - Internal
+- ✅ NULL (0) - Ping test
 
-#### MOUNT (Program 100005)
-- [ ] NULL (0) - Ping test
-- [ ] MNT (1) - Mount directory
-- [ ] UMNT (3) - Unmount directory
+#### PORTMAP (Program 100000) - Port 4000
+- ✅ NULL (0) - Ping test
+- ✅ GETPORT (3) - Get port for program/version
+- ✅ DUMP (4) - List all registered services
 
-#### NFSv3 (Program 100003)
-- [ ] NULL (0) - Ping test
-- [ ] GETATTR (1) - Get file attributes
-- [ ] SETATTR (2) - Set file attributes
-- [ ] LOOKUP (3) - Look up filename
-- [ ] READ (6) - Read from file
-- [ ] WRITE (7) - Write to file
-- [ ] CREATE (8) - Create file
-- [ ] MKDIR (9) - Create directory
-- [ ] READDIR (16) - Read directory entries
+#### MOUNT (Program 100005) - Port 4000
+- ✅ NULL (0) - Ping test
+- ✅ MNT (1) - Mount directory, return file handle
+- ✅ DUMP (2) - List all mounts
+- ✅ UMNT (3) - Unmount directory
+- ✅ UMNTALL (4) - Unmount all
+- ✅ EXPORT (5) - List exported directories
+
+#### NFSv3 (Program 100003) - Port 4000
+
+**Implemented** (12/22):
+- ✅ NULL (0) - Ping test
+- ✅ GETATTR (1) - Get file attributes
+- ✅ SETATTR (2) - Set file attributes (size, mode, owner)
+- ✅ LOOKUP (3) - Look up filename
+- ✅ ACCESS (4) - Check access permissions
+- ✅ READ (6) - Read from file
+- ✅ WRITE (7) - Write to file
+- ✅ CREATE (8) - Create file
+- ✅ READDIR (16) - Read directory entries
+- ✅ FSSTAT (18) - Get filesystem statistics
+- ✅ FSINFO (19) - Get filesystem static info
+- ✅ PATHCONF (20) - Get POSIX path info
+
+**Not Implemented** (10/22):
+- ❌ READLINK (5) - Read symbolic link
+- ❌ MKDIR (9) - Create directory
+- ❌ SYMLINK (10) - Create symbolic link
+- ❌ MKNOD (11) - Create special device
+- ❌ REMOVE (12) - Remove file
+- ❌ RMDIR (13) - Remove directory
+- ❌ RENAME (14) - Rename file/directory
+- ❌ LINK (15) - Create hard link
+- ❌ READDIRPLUS (17) - Extended READDIR with attributes
+- ❌ COMMIT (21) - Commit cached data
+
+## Testing Implications
+
+This issue revealed that **Python integration tests were insufficient**:
+- Tests sent incorrect 60-byte format
+- Server's lenient deserializer only read needed bytes, ignored extra
+- Tests passed, but real Linux clients failed
+- **Lesson**: Need strict format validation in tests (see TODO.md)
 
 ## Design Decisions
 
@@ -376,7 +554,7 @@ impl Unpack for mountres3 { ... }
 2. **Clear Separation**: Protocol specs vs. implementation
 3. **Version Management**: Easy to see v3 vs. v4 differences
 4. **Build Simplification**: One place to run code generation
-5. **Future Extensibility**: Can support multiple generators (xdrgen, rpcgen, custom)
+5. **Future Extensibility**: Can support multiple generators
 
 ### Why One Operation Per File?
 
@@ -385,7 +563,7 @@ impl Unpack for mountres3 { ... }
 **Benefits**:
 1. **Easy Navigation**: `git grep "GETATTR"` → one file
 2. **Clear Git History**: Changes to READ don't pollute WRITE history
-3. **Parallel Development**: Different team members work on different operations
+3. **Parallel Development**: Different developers work on different operations
 4. **Focused Testing**: Unit tests per operation
 5. **Code Review**: Smaller, focused diffs
 
@@ -393,74 +571,120 @@ impl Unpack for mountres3 { ... }
 
 **Purpose**: Bridge between raw XDR types and business logic
 
-**Without Middleware** (hypothetical):
+**Without Middleware**:
 ```rust
 // Handler directly uses generated types - messy!
-use target::..::rpc_generated::*;  // ❌ Ugly path
-let (msg, _) = rpc_call_msg::unpack(&mut cursor)?;  // ❌ Repeated everywhere
+use target::..::nfs_generated::*;  // ❌ Ugly path
+let (msg, _) = GETATTR3args::unpack(&mut cursor)?;  // ❌ Repeated everywhere
 ```
 
 **With Middleware**:
 ```rust
-use crate::protocol::v3::RpcMessage;  // ✅ Clean import
-let msg = RpcMessage::deserialize_call(data)?;  // ✅ Ergonomic API
+use crate::protocol::v3::NfsMessage;  // ✅ Clean import
+let args = NfsMessage::deserialize_getattr3args(data)?;  // ✅ Ergonomic API
 ```
 
 **Additional Benefits**:
-- Type conversions (e.g., `fhandle3(Vec<u8>)` ↔ internal handle)
+- Type conversions (e.g., FSAL ↔ NFS attributes)
 - Validation before reaching handlers
-- Logging/tracing instrumentation points
-- Future: metrics collection
+- Logging/tracing instrumentation
+- Metrics collection points
+
+### Why Filesystem Abstraction Layer (FSAL)?
+
+**Purpose**: Support multiple storage backends without changing NFS code
+
+**Benefits**:
+1. **Pluggable Backends**: Local fs, S3, memory, custom
+2. **Testing**: Mock filesystem for unit tests
+3. **Portability**: Same NFS code works with any backend
+4. **Future Features**: Caching, replication, virtual filesystems
 
 ## Testing
 
-### Current Tests
+### Integration Tests
 
-**RPC NULL Test** (`tests/test_rpc_null.py`):
-```python
-# Sends: RPC call with record marking
-# XID: 12345, Program: 100003, Version: 3, Procedure: 0
+All tests are Python scripts in `tests/`:
 
-# Expects: RPC reply
-# XID: 12345, Status: MSG_ACCEPTED, Accept: SUCCESS
-```
+| Test File | Purpose | Status |
+|-----------|---------|--------|
+| `test_rpc_null.py` | RPC NULL procedure | ✅ |
+| `test_portmap.py` | PORTMAP procedures | ✅ |
+| `test_mount_null.py` | MOUNT NULL | ✅ |
+| `test_mount.py` | MOUNT MNT/UMNT/EXPORT | ✅ |
+| `test_nfs_null.py` | NFS NULL | ✅ |
+| `test_nfs_getattr.py` | NFS GETATTR | ✅ |
+| `test_nfs_lookup.py` | NFS LOOKUP | ✅ |
+| `test_nfs_read.py` | NFS READ | ✅ |
+| `test_nfs_write.py` | NFS WRITE | ✅ |
+| `test_nfs_create.py` | NFS CREATE | ✅ |
+| `test_nfs_setattr.py` | NFS SETATTR (truncate) | ✅ |
+| `test_nfs_readdir.py` | NFS READDIR | ✅ |
 
-**Run Tests**:
+### Running Tests
+
 ```bash
 # Start server
 cargo run
 
-# Run test (separate terminal)
-python3 tests/test_rpc_null.py
+# Run all tests (separate terminal)
+for test in tests/test_*.py; do
+    echo "Running $test..."
+    python3 "$test"
+done
+```
+
+### Real-World Testing
+
+```bash
+# Mount as NFS client
+sudo mount -t nfs -o vers=3,proto=tcp,port=4000,mountport=4000,nolock,noresvport,nordirplus localhost:/ /mnt/test
+
+# Test operations
+echo "Hello NFS" > /mnt/test/file.txt
+cat /mnt/test/file.txt
+ls -la /mnt/test/
 ```
 
 ### Future Testing Strategy
 
-1. **Unit Tests**: Per-operation handlers (`src/nfs/v3/getattr_test.rs`)
-2. **Integration Tests**: Full RPC→FSAL flow
+1. **Unit Tests**: Per-operation handlers with mock FSAL
+2. **Integration Tests**: Full RPC→FSAL→Response flow
 3. **Compliance Tests**: RFC 1813 test suite
 4. **Performance Tests**: Throughput, latency benchmarks
-5. **Compatibility Tests**: Real NFS clients (Linux mount, macOS, Windows)
+5. **Compatibility Tests**: Multiple NFS clients (Linux, macOS, Windows)
+6. **Stress Tests**: Concurrent operations, large files
+7. **Format Validation**: Strict XDR byte-level tests (see TODO.md)
 
 ## Build & Development
 
-### Local Development
+### Prerequisites
 
 ```bash
 # Install xdrgen (one-time)
 cargo install xdrgen
 
+# Install Rust (if needed)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+### Local Development
+
+```bash
 # Build
 cargo build
 
-# Run
-cargo run
+# Run with logging
+RUST_LOG=debug cargo run
 
-# Test
+# Run tests
 cargo test
 
-# Test RPC NULL
-python3 tests/test_rpc_null.py
+# Format code
+cargo fmt
+
+# Lint
+cargo clippy
 ```
 
 ### Docker Build (Earthly)
@@ -476,44 +700,124 @@ make build
 ### Adding a New NFS Operation
 
 1. **Update XDR** (if needed): `xdr/v3/nfs.x`
-2. **Add Handler**: `src/nfs/v3/operation_name.rs`
-3. **Register in Dispatcher**: `src/nfs/v3/mod.rs`
-4. **Add Test**: `tests/test_nfs_operation.py`
-5. **Update Docs**: This file
+2. **Add Handler**: `src/nfs/operation_name.rs`
+3. **Register in Dispatcher**: `src/nfs/dispatcher.rs`
+4. **Add FSAL Method** (if needed): `src/fsal/mod.rs`
+5. **Implement in Local Backend**: `src/fsal/local.rs`
+6. **Add Integration Test**: `tests/test_nfs_operation.py`
+7. **Update Documentation**: This file
 
-## Future Roadmap
+## Known Issues & Lessons Learned
 
-### Phase 1: MOUNT Protocol ✅ RPC NULL
-- [x] RPC server with record marking
-- [x] RPC NULL procedure
-- [ ] MOUNT NULL procedure
-- [ ] MOUNT MNT procedure (return file handle)
-- [ ] MOUNT UMNT procedure
+### 1. XDR Union vs Struct Confusion
+**Issue**: Used struct for optional attributes, caused "failed to fill whole buffer" errors with Linux clients.
 
-### Phase 2: NFSv3 Core Operations
-- [ ] NFS NULL procedure
-- [ ] GETATTR (file attributes)
-- [ ] LOOKUP (filename to file handle)
-- [ ] READ (read file data)
-- [ ] WRITE (write file data)
+**Solution**: Changed to union types. See [XDR Union vs Struct](#xdr-union-vs-struct---critical-lesson) section.
 
-### Phase 3: FSAL (Filesystem Abstraction)
-- [ ] Local filesystem backend
-- [ ] In-memory filesystem (testing)
-- [ ] Handle mapping (file handle ↔ inode)
-- [ ] Permission checking
+**Lesson**: XDR unions are not just enums - they control serialization. Always use unions for optional fields in NFS protocols.
 
-### Phase 4: NFSv3 Complete
-- [ ] CREATE, MKDIR, REMOVE, RMDIR
-- [ ] READDIR, READDIRPLUS
-- [ ] SYMLINK, READLINK
-- [ ] COMMIT, FSSTAT, FSINFO
+### 2. Python Tests Not Catching Format Errors
+**Issue**: Integration tests passed even with incorrect XDR format because server's deserializer is lenient.
 
-### Phase 5: NFSv4 Support
-- [ ] New XDR specs in `xdr/v4/`
-- [ ] Compound operations
-- [ ] Stateful protocol
-- [ ] Delegation
+**Solution**: Need to add strict byte-level validation (see Python Test Improvements below).
+
+**Lesson**: Integration tests need to verify exact wire format, not just end-to-end functionality.
+
+### 3. Copy Trait for Union Types
+**Issue**: xdrgen generates `Copy` trait for union types containing `Box<T>`, causing compile errors.
+
+**Solution**: `build.rs` post-processes generated code to remove `Copy` from affected types.
+
+**Lesson**: Code generation always needs some manual fixups for edge cases.
+
+## Implementation Status
+
+### Completed NFSv3 Procedures (12/22)
+
+| Procedure | Number | Status | Description |
+|-----------|--------|--------|-------------|
+| NULL | 0 | ✅ | Null procedure (ping) |
+| GETATTR | 1 | ✅ | Get file attributes |
+| SETATTR | 2 | ✅ | Set file attributes (truncate, chmod, chown) |
+| LOOKUP | 3 | ✅ | Lookup filename |
+| ACCESS | 4 | ✅ | Check access permissions |
+| READ | 6 | ✅ | Read from file |
+| WRITE | 7 | ✅ | Write to file |
+| CREATE | 8 | ✅ | Create file |
+| READDIR | 16 | ✅ | Read directory entries |
+| FSSTAT | 18 | ✅ | Get filesystem statistics |
+| FSINFO | 19 | ✅ | Get filesystem info |
+| PATHCONF | 20 | ✅ | Get POSIX path configuration |
+
+**Key Features Working:**
+- Basic file operations (read, write, create)
+- File attribute management (getattr, setattr)
+- Directory listing (readdir)
+- Shell redirection (`echo "hello" > file.txt`)
+- Real Linux NFS client compatibility
+
+### Not Yet Implemented (10/22)
+
+| Procedure | Number | Priority | Description |
+|-----------|--------|----------|-------------|
+| READLINK | 5 | Medium | Read symbolic link |
+| MKDIR | 9 | High | Create directory |
+| SYMLINK | 10 | Medium | Create symbolic link |
+| MKNOD | 11 | Low | Create special device |
+| REMOVE | 12 | High | Remove file |
+| RMDIR | 13 | High | Remove directory |
+| RENAME | 14 | High | Rename file/directory |
+| LINK | 15 | Medium | Create hard link |
+| READDIRPLUS | 17 | Medium | Read directory with attributes |
+| COMMIT | 21 | Medium | Commit cached data to stable storage |
+
+### Python Test Improvements Needed
+
+The current Python integration tests (`tests/test_nfs_*.py`) need the following improvements:
+
+1. **Add Length Assertions for XDR Union Format**
+   - Currently tests only check functional correctness
+   - Need to verify exact byte lengths of serialized data
+   - Example: `sattr3` with all DONT_SET should be exactly 24 bytes (6 discriminators × 4 bytes)
+   - Example: `sattr3` with SET_SIZE should be 32 bytes (5 discriminators + 1 discriminator + u64 size)
+
+2. **Add Strict Format Validation Tests**
+   - Create tests that specifically detect struct vs union mismatches
+   - Send deliberately wrong formats and verify server rejects them
+   - Test boundary cases (partial data, extra data, wrong discriminator values)
+
+3. **Consider Adding tcpdump-based Tests**
+   - Capture real Linux NFS client traffic with tcpdump
+   - Compare our server's responses with reference implementations
+   - Validate wire format matches RFC 1813 exactly
+
+**Files to improve:**
+- `tests/test_nfs_create.py` - Add sattr3 length validation
+- `tests/test_nfs_setattr.py` - Add sattr3 length validation
+- `tests/test_nfs_write.py` - Add general response format validation
+
+### Other Improvements
+
+**Code Quality:**
+- Add comprehensive error handling for all edge cases
+- Improve logging and debugging output
+- Add performance benchmarks
+
+**Security:**
+- Implement AUTH_UNIX authentication (currently using AUTH_NONE)
+- Add proper access control checks
+- Validate file handle security
+
+**Configuration:**
+- Support multiple export points (currently hardcoded to `/tmp/nfs_exports`)
+- Add configuration file support (export paths, permissions, etc.)
+- Add runtime configuration reload
+
+**Production Readiness:**
+- Add metrics and monitoring (Prometheus, etc.)
+- Implement proper daemon mode
+- Add systemd service file
+- Create comprehensive documentation
 
 ## References
 
@@ -521,10 +825,12 @@ make build
 - [RFC 5531](https://www.rfc-editor.org/rfc/rfc5531): RPC Protocol Specification Version 2
 - [RFC 4506](https://www.rfc-editor.org/rfc/rfc4506): XDR: External Data Representation Standard
 - [RFC 1813](https://www.rfc-editor.org/rfc/rfc1813): NFS Version 3 Protocol Specification
+- [RFC 1833](https://www.rfc-editor.org/rfc/rfc1833): Binding Protocols for ONC RPC Version 2
 - [RFC 7530](https://www.rfc-editor.org/rfc/rfc7530): NFSv4 Protocol
 
 ### Inspirations
 - [NFS-Ganesha](https://github.com/nfs-ganesha/nfs-ganesha): Production NFS server in C
+- [zerofs_nfsserve](https://github.com/Barre/zerofs_nfsserve): Reference implementation that helped solve the union issue
 - [nfs-server-rs](https://github.com/xetdata/nfs-server-rs): Rust NFS implementation
 - [rust-xdr](https://github.com/jsgf/rust-xdr): xdrgen and xdr-codec libraries
 
@@ -532,22 +838,9 @@ make build
 - [xdrgen](https://crates.io/crates/xdrgen): XDR code generator
 - [xdr-codec](https://crates.io/crates/xdr-codec): XDR serialization runtime
 - [tokio](https://tokio.rs/): Async runtime
-
-## Contributing
-
-### Code Style
-- Follow Rust idioms and naming conventions
-- One operation per file
-- Document public APIs
-- Add unit tests for new operations
-- Run `cargo fmt` and `cargo clippy` before committing
-
-### Architecture Changes
-- Discuss in issues before major refactoring
-- Keep layers separate and well-defined
-- Maintain backwards compatibility with NFSv3 RFC
+- [anyhow](https://crates.io/crates/anyhow): Error handling
+- [tracing](https://crates.io/crates/tracing): Structured logging
 
 ---
 
-**Last Updated**: 2025-12-02
-**Version**: 0.1.0 - Initial RPC NULL implementation complete
+**Last Updated**: 2025-12-05
