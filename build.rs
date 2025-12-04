@@ -66,6 +66,10 @@ fn main() {
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum FSSTAT3res",
                 "#[derive( Clone , Debug , Eq , PartialEq )] pub enum FSSTAT3res"
             );
+            generated_code = generated_code.replace(
+                "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum PATHCONF3res",
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum PATHCONF3res"
+            );
         }
 
         fs::write(&output_path, generated_code.as_bytes())

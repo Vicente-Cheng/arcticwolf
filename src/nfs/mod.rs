@@ -10,6 +10,8 @@ mod fsstat;
 mod getattr;
 mod lookup;
 mod null;
+mod pathconf;
 mod read;
+mod readdir;
 
 pub use dispatcher::dispatch;

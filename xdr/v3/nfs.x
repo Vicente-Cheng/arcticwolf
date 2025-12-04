@@ -264,6 +264,71 @@ const FSF3_SYMLINK     = 0x0002;
 const FSF3_HOMOGENEOUS = 0x0008;
 const FSF3_CANSETTIME  = 0x0010;
 
+/* ===== READDIR Procedure (16) ===== */
+
+struct READDIR3args {
+    fhandle3 dir;
+    cookie3 cookie;
+    cookieverf3 cookieverf;
+    uint32 count;
+};
+
+struct entry3 {
+    fileid3 fileid;
+    filename3 name;
+    cookie3 cookie;
+    entry3 *nextentry;
+};
+
+struct dirlist3 {
+    entry3 *entries;
+    bool eof;
+};
+
+struct READDIR3resok {
+    fattr3 dir_attributes;
+    cookieverf3 cookieverf;
+    dirlist3 reply;
+};
+
+struct READDIR3resfail {
+    fattr3 dir_attributes;
+};
+
+union READDIR3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        READDIR3resok resok;
+    default:
+        READDIR3resfail resfail;
+};
+
+/* ===== PATHCONF Procedure (20) ===== */
+
+struct PATHCONF3args {
+    fhandle3 object;
+};
+
+struct PATHCONF3resok {
+    fattr3 obj_attributes;
+    uint32 linkmax;
+    uint32 name_max;
+    bool no_trunc;
+    bool chown_restricted;
+    bool case_insensitive;
+    bool case_preserving;
+};
+
+struct PATHCONF3resfail {
+    fattr3 obj_attributes;
+};
+
+union PATHCONF3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        PATHCONF3resok resok;
+    default:
+        PATHCONF3resfail resfail;
+};
+
 /* ===== NULL Procedure (0) ===== */
 /* Arguments: void */
 /* Results: void */

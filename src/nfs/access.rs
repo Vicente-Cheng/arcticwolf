@@ -59,7 +59,12 @@ pub fn handle_access(
                 nfsstat3::NFS3ERR_IO
             };
 
-            let res_data = NfsMessage::create_access_error_response(error_status)?;
+            // Create ACCESS error response with post_op_attr format
+            use xdr_codec::Pack;
+            let mut buf = Vec::new();
+            (error_status as i32).pack(&mut buf)?;
+            false.pack(&mut buf)?;  // attributes_follow = FALSE
+            let res_data = BytesMut::from(&buf[..]);
             return RpcMessage::create_success_reply_with_data(xid, res_data);
         }
     };
@@ -101,11 +106,22 @@ pub fn handle_access(
     // Convert FSAL attributes to NFS fattr3
     let nfs_attrs = NfsMessage::fsal_to_fattr3(&file_attrs);
 
-    // Create successful response
-    let response = NfsMessage::create_access_ok(nfs_attrs, granted_access);
+    // Create successful ACCESS response manually with post_op_attr format
+    use xdr_codec::Pack;
+    let mut buf = Vec::new();
 
-    // Serialize response
-    let res_data = NfsMessage::serialize_access3res(&response)?;
+    // 1. nfsstat3 status = NFS3_OK (0)
+    (nfsstat3::NFS3_OK as i32).pack(&mut buf)?;
+
+    // 2. post_op_attr (obj_attributes)
+    // post_op_attr = bool (1 = present) + fattr3 (if present)
+    true.pack(&mut buf)?;  // attributes_follow = TRUE
+    nfs_attrs.pack(&mut buf)?;
+
+    // 3. access (granted permissions)
+    granted_access.pack(&mut buf)?;
+
+    let res_data = BytesMut::from(&buf[..]);
 
     // Wrap in RPC reply
     RpcMessage::create_success_reply_with_data(xid, res_data)

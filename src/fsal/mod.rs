@@ -73,6 +73,19 @@ pub struct FileTime {
     pub nseconds: u32,
 }
 
+/// Directory entry
+///
+/// Represents a single entry in a directory listing.
+#[derive(Debug, Clone)]
+pub struct DirEntry {
+    /// File ID (inode number)
+    pub fileid: u64,
+    /// Entry name
+    pub name: String,
+    /// File type
+    pub file_type: FileType,
+}
+
 /// Filesystem trait
 ///
 /// This trait defines the interface that all filesystem backends must implement.
@@ -115,6 +128,17 @@ pub trait Filesystem: Send + Sync {
     /// # Returns
     /// Vector of bytes read (may be shorter than count if EOF reached)
     fn read(&self, handle: &FileHandle, offset: u64, count: u32) -> Result<Vec<u8>>;
+
+    /// Read directory entries
+    ///
+    /// # Arguments
+    /// * `dir_handle` - Directory handle
+    /// * `cookie` - Starting position (0 = from beginning)
+    /// * `count` - Maximum number of entries to return
+    ///
+    /// # Returns
+    /// Tuple of (entries, eof) where eof indicates if all entries were returned
+    fn readdir(&self, dir_handle: &FileHandle, cookie: u64, count: u32) -> Result<(Vec<DirEntry>, bool)>;
 
     /// Write data to a file
     ///

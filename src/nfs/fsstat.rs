@@ -69,13 +69,27 @@ pub fn handle_fsstat(
     // Convert FSAL attributes to NFS fattr3
     let nfs_attrs = NfsMessage::fsal_to_fattr3(&obj_attrs);
 
-    // Create successful response
-    let response = NfsMessage::create_fsstat_ok(
-        nfs_attrs, tbytes, fbytes, abytes, tfiles, ffiles, afiles, invarsec,
-    );
+    // Create FSSTAT response manually with post_op_attr format
+    use xdr_codec::Pack;
+    let mut buf = Vec::new();
 
-    // Serialize response
-    let res_data = NfsMessage::serialize_fsstat3res(&response)?;
+    // 1. nfsstat3 status = NFS3_OK (0)
+    (nfsstat3::NFS3_OK as i32).pack(&mut buf)?;
+
+    // 2. post_op_attr (obj_attributes)
+    true.pack(&mut buf)?;  // attributes_follow = TRUE
+    nfs_attrs.pack(&mut buf)?;
+
+    // 3. FSSTAT fields
+    tbytes.pack(&mut buf)?;
+    fbytes.pack(&mut buf)?;
+    abytes.pack(&mut buf)?;
+    tfiles.pack(&mut buf)?;
+    ffiles.pack(&mut buf)?;
+    afiles.pack(&mut buf)?;
+    invarsec.pack(&mut buf)?;
+
+    let res_data = BytesMut::from(&buf[..]);
 
     // Wrap in RPC reply
     RpcMessage::create_success_reply_with_data(xid, res_data)

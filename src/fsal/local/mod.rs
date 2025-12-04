@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use tracing::{debug, warn};
 
 use super::handle::{FileHandle, HandleManager};
-use super::{FileAttributes, FileTime, FileType, Filesystem};
+use super::{DirEntry, FileAttributes, FileTime, FileType, Filesystem};
 
 /// Local filesystem implementation
 pub struct LocalFilesystem {
@@ -229,6 +229,73 @@ impl Filesystem for LocalFilesystem {
         );
 
         Ok(buffer)
+    }
+
+    fn readdir(&self, dir_handle: &FileHandle, cookie: u64, count: u32) -> Result<(Vec<DirEntry>, bool)> {
+        let dir_path = self.resolve_handle(dir_handle)?;
+
+        // Verify it's a directory
+        let metadata = fs::metadata(&dir_path)
+            .context(format!("Failed to stat directory: {:?}", dir_path))?;
+
+        if !metadata.is_dir() {
+            return Err(anyhow!("Not a directory: {:?}", dir_path));
+        }
+
+        // Read directory entries
+        let read_dir = fs::read_dir(&dir_path)
+            .context(format!("Failed to read directory: {:?}", dir_path))?;
+
+        // Collect all entries
+        let mut entries: Vec<DirEntry> = Vec::new();
+
+        for (index, entry_result) in read_dir.enumerate() {
+            let entry = entry_result.context("Failed to read directory entry")?;
+            let entry_path = entry.path();
+            let entry_metadata = entry.metadata()
+                .context(format!("Failed to get metadata for: {:?}", entry_path))?;
+
+            let file_type = if entry_metadata.is_dir() {
+                FileType::Directory
+            } else if entry_metadata.is_file() {
+                FileType::RegularFile
+            } else if entry_metadata.is_symlink() {
+                FileType::SymbolicLink
+            } else {
+                FileType::RegularFile // Default
+            };
+
+            let name = entry.file_name()
+                .to_string_lossy()
+                .to_string();
+
+            // Skip entries before cookie (cookie is 0-based index + 1)
+            if cookie > 0 && (index as u64) < cookie {
+                continue;
+            }
+
+            entries.push(DirEntry {
+                fileid: entry_metadata.ino(),
+                name,
+                file_type,
+            });
+
+            // Check if we've reached the requested count
+            if entries.len() >= count as usize {
+                debug!(
+                    "READDIR: {:?} cookie={} count={} -> {} entries (more available)",
+                    dir_path, cookie, count, entries.len()
+                );
+                return Ok((entries, false)); // Not EOF, more entries available
+            }
+        }
+
+        debug!(
+            "READDIR: {:?} cookie={} count={} -> {} entries (EOF)",
+            dir_path, cookie, count, entries.len()
+        );
+
+        Ok((entries, true)) // EOF reached
     }
 
     fn write(&self, handle: &FileHandle, offset: u64, data: &[u8]) -> Result<u32> {

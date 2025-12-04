@@ -67,14 +67,11 @@ impl NfsMessage {
     ///
     /// LOOKUP error includes directory attributes in the failure case
     pub fn create_lookup_error_response(status: nfsstat3) -> Result<BytesMut> {
-        // For LOOKUP error, we need status + LOOKUP3resfail (which contains dir_attributes)
-        // However, we don't have dir_attributes in error path, so we serialize
-        // just the status and an empty/minimal fattr3
-
-        // For now, just serialize the status code for simplicity
-        // TODO: Add proper dir_attributes in error responses
+        // For LOOKUP error, we need status + post_op_attr (dir_attributes)
+        // Since we don't have dir_attributes in error path, we use FALSE for post_op_attr
         let mut buf = Vec::new();
         (status as i32).pack(&mut buf)?;
+        false.pack(&mut buf)?;  // dir_attributes: post_op_attr = FALSE (no attributes)
         Ok(BytesMut::from(&buf[..]))
     }
 
@@ -109,10 +106,10 @@ impl NfsMessage {
 
     /// Create a READ error response
     pub fn create_read_error_response(status: nfsstat3) -> Result<BytesMut> {
-        // For READ error, just serialize the status code
-        // The default variant in the union handles error cases
+        // For READ error, we need status + post_op_attr (file_attributes)
         let mut buf = Vec::new();
         (status as i32).pack(&mut buf)?;
+        false.pack(&mut buf)?;  // file_attributes: post_op_attr = FALSE (no attributes)
         Ok(BytesMut::from(&buf[..]))
     }
 
@@ -210,6 +207,7 @@ impl NfsMessage {
     pub fn create_fsstat_error_response(status: nfsstat3) -> Result<BytesMut> {
         let mut buf = Vec::new();
         (status as i32).pack(&mut buf)?;
+        false.pack(&mut buf)?;  // obj_attributes: post_op_attr = FALSE (no attributes)
         Ok(BytesMut::from(&buf[..]))
     }
 
@@ -338,5 +336,40 @@ impl NfsMessage {
                 nseconds: attrs.ctime.nseconds,
             },
         }
+    }
+
+    /// Deserialize READDIR request
+    pub fn deserialize_readdir3args(data: &[u8]) -> Result<READDIR3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = READDIR3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
+
+    /// Serialize READDIR response
+    pub fn serialize_readdir3res(res: &READDIR3res) -> Result<BytesMut> {
+        let mut buf = Vec::new();
+        res.pack(&mut buf)?;
+        Ok(BytesMut::from(&buf[..]))
+    }
+
+    /// Create a successful READDIR response
+    pub fn create_readdir_ok(
+        dir_attributes: fattr3,
+        cookieverf: cookieverf3,
+        entries: Option<Box<entry3>>,
+        eof: bool,
+    ) -> READDIR3res {
+        READDIR3res::NFS3_OK(READDIR3resok {
+            dir_attributes,
+            cookieverf,
+            reply: dirlist3 { entries, eof },
+        })
+    }
+
+    /// Create a READDIR error response
+    pub fn create_readdir_error_response(status: nfsstat3) -> Result<BytesMut> {
+        let mut buf = Vec::new();
+        (status as i32).pack(&mut buf)?;
+        Ok(BytesMut::from(&buf[..]))
     }
 }

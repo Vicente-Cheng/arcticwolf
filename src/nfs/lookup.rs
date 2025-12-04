@@ -98,11 +98,25 @@ pub fn handle_lookup(
     use crate::protocol::v3::nfs::fhandle3;
     let nfs_handle = fhandle3(file_handle);
 
-    // Create successful response
-    let response = NfsMessage::create_lookup_ok(nfs_handle, nfs_obj_attrs, nfs_dir_attrs);
+    // Create LOOKUP response manually with post_op_attr format
+    use xdr_codec::Pack;
+    let mut buf = Vec::new();
 
-    // Serialize response
-    let res_data = NfsMessage::serialize_lookup3res(&response)?;
+    // 1. nfsstat3 status = NFS3_OK (0)
+    (nfsstat3::NFS3_OK as i32).pack(&mut buf)?;
+
+    // 2. file handle (fhandle3)
+    nfs_handle.pack(&mut buf)?;
+
+    // 3. post_op_attr (obj_attributes)
+    true.pack(&mut buf)?;  // attributes_follow = TRUE
+    nfs_obj_attrs.pack(&mut buf)?;
+
+    // 4. post_op_attr (dir_attributes)
+    true.pack(&mut buf)?;  // attributes_follow = TRUE
+    nfs_dir_attrs.pack(&mut buf)?;
+
+    let res_data = BytesMut::from(&buf[..]);
 
     // Wrap in RPC reply
     RpcMessage::create_success_reply_with_data(xid, res_data)

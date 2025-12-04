@@ -9,7 +9,7 @@ use tracing::{debug, warn};
 use crate::fsal::Filesystem;
 use crate::protocol::v3::rpc::rpc_call_msg;
 
-use super::{access, fsinfo, fsstat, getattr, lookup, null, read};
+use super::{access, fsinfo, fsstat, getattr, lookup, null, pathconf, read, readdir};
 
 /// Dispatch NFS procedure call to appropriate handler
 ///
@@ -61,6 +61,10 @@ pub fn dispatch(
             // READ - read from file
             read::handle_read(xid, args_data, filesystem)
         }
+        16 => {
+            // READDIR - read directory entries
+            readdir::handle_readdir(xid, args_data, filesystem)
+        }
         18 => {
             // FSSTAT - get filesystem statistics
             fsstat::handle_fsstat(xid, args_data, filesystem)
@@ -69,24 +73,44 @@ pub fn dispatch(
             // FSINFO - get filesystem information
             fsinfo::handle_fsinfo(xid, args_data, filesystem)
         }
+        20 => {
+            // PATHCONF - get filesystem path configuration
+            pathconf::handle_pathconf(xid, args_data, filesystem)
+        }
+        17 => {
+            // READDIRPLUS - read directory entries with attributes (not yet implemented)
+            // Return NFS3ERR_NOTSUPP so client falls back to READDIR
+            warn!("NFS READDIRPLUS not yet implemented, returning NOTSUPP");
+            create_notsupp_response(xid)
+        }
         7 => {
             // WRITE - write to file
             warn!("NFS WRITE not yet implemented");
-            Err(anyhow!("WRITE not implemented"))
+            create_notsupp_response(xid)
         }
         8 => {
             // CREATE - create file
             warn!("NFS CREATE not yet implemented");
-            Err(anyhow!("CREATE not implemented"))
+            create_notsupp_response(xid)
         }
         9 => {
             // MKDIR - create directory
             warn!("NFS MKDIR not yet implemented");
-            Err(anyhow!("MKDIR not implemented"))
+            create_notsupp_response(xid)
         }
         _ => {
             warn!("Unknown NFS procedure: {}", procedure);
-            Err(anyhow!("Unknown procedure: {}", procedure))
+            create_notsupp_response(xid)
         }
     }
+}
+
+/// Create a NFS3ERR_NOTSUPP error response
+fn create_notsupp_response(xid: u32) -> Result<BytesMut> {
+    use xdr_codec::Pack;
+
+    let mut buf = Vec::new();
+    (crate::protocol::v3::nfs::nfsstat3::NFS3ERR_NOTSUPP as i32).pack(&mut buf)?;
+    let res_data = BytesMut::from(&buf[..]);
+    crate::protocol::v3::rpc::RpcMessage::create_success_reply_with_data(xid, res_data)
 }

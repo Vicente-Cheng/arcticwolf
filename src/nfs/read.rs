@@ -85,11 +85,36 @@ pub fn handle_read(
     // Convert FSAL attributes to NFS fattr3
     let nfs_attrs = NfsMessage::fsal_to_fattr3(&file_attrs);
 
-    // Create successful response
-    let response = NfsMessage::create_read_ok(nfs_attrs, bytes_read, eof, data);
+    // Create READ response manually with post_op_attr format
+    use xdr_codec::Pack;
+    let mut buf = Vec::new();
 
-    // Serialize response
-    let res_data = NfsMessage::serialize_read3res(&response)?;
+    // 1. nfsstat3 status = NFS3_OK (0)
+    (nfsstat3::NFS3_OK as i32).pack(&mut buf)?;
+
+    // 2. post_op_attr (file_attributes)
+    true.pack(&mut buf)?;  // attributes_follow = TRUE
+    nfs_attrs.pack(&mut buf)?;
+
+    // 3. count (bytes read)
+    bytes_read.pack(&mut buf)?;
+
+    // 4. eof (end of file)
+    eof.pack(&mut buf)?;
+
+    // 5. data (opaque<>) - pack as variable-length opaque data
+    // XDR opaque format: length (u32) + data + padding to 4-byte boundary
+    let data_len = data.len() as u32;
+    data_len.pack(&mut buf)?;
+    buf.extend_from_slice(&data);
+
+    // Add padding to align to 4-byte boundary
+    let padding = (4 - (data.len() % 4)) % 4;
+    for _ in 0..padding {
+        buf.push(0);
+    }
+
+    let res_data = BytesMut::from(&buf[..]);
 
     // Wrap in RPC reply
     RpcMessage::create_success_reply_with_data(xid, res_data)
