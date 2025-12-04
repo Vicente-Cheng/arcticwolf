@@ -9,7 +9,7 @@ use tracing::{debug, warn};
 use crate::fsal::Filesystem;
 use crate::protocol::v3::rpc::rpc_call_msg;
 
-use super::{access, fsinfo, fsstat, getattr, lookup, null, pathconf, read, readdir};
+use super::{access, create, fsinfo, fsstat, getattr, lookup, null, pathconf, read, readdir, setattr, write};
 
 /// Dispatch NFS procedure call to appropriate handler
 ///
@@ -49,6 +49,10 @@ pub fn dispatch(
             // GETATTR - get file attributes
             getattr::handle_getattr(xid, args_data, filesystem)
         }
+        2 => {
+            // SETATTR - set file attributes
+            setattr::handle_setattr(xid, args_data, filesystem)
+        }
         3 => {
             // LOOKUP - lookup filename
             lookup::handle_lookup(xid, args_data, filesystem)
@@ -85,13 +89,11 @@ pub fn dispatch(
         }
         7 => {
             // WRITE - write to file
-            warn!("NFS WRITE not yet implemented");
-            create_notsupp_response(xid)
+            write::handle_write(xid, args_data, filesystem)
         }
         8 => {
             // CREATE - create file
-            warn!("NFS CREATE not yet implemented");
-            create_notsupp_response(xid)
+            create::handle_create(xid, args_data, filesystem)
         }
         9 => {
             // MKDIR - create directory

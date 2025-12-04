@@ -132,6 +132,66 @@ impl NfsMessage {
         Ok(BytesMut::from(&buf[..]))
     }
 
+    // ===== WRITE Helpers =====
+
+    /// Deserialize WRITE request
+    pub fn deserialize_write3args(data: &[u8]) -> Result<WRITE3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = WRITE3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
+
+    /// Create a WRITE error response
+    pub fn create_write_error_response(status: nfsstat3) -> Result<BytesMut> {
+        // For WRITE error, we need status + wcc_data (file_wcc)
+        // wcc_data = pre_op_attr + post_op_attr
+        let mut buf = Vec::new();
+        (status as i32).pack(&mut buf)?;
+        false.pack(&mut buf)?;  // pre_op_attr = FALSE (no before attributes)
+        false.pack(&mut buf)?;  // post_op_attr = FALSE (no after attributes)
+        Ok(BytesMut::from(&buf[..]))
+    }
+
+    // ===== SETATTR Helpers =====
+
+    /// Deserialize SETATTR request
+    pub fn deserialize_setattr3args(data: &[u8]) -> Result<SETATTR3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = SETATTR3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
+
+    /// Create a SETATTR error response
+    pub fn create_setattr_error_response(status: nfsstat3) -> Result<BytesMut> {
+        // For SETATTR error, we need status + wcc_data (obj_wcc)
+        // wcc_data = pre_op_attr + post_op_attr
+        let mut buf = Vec::new();
+        (status as i32).pack(&mut buf)?;
+        false.pack(&mut buf)?;  // pre_op_attr = FALSE
+        false.pack(&mut buf)?;  // post_op_attr = FALSE
+        Ok(BytesMut::from(&buf[..]))
+    }
+
+    // ===== CREATE Helpers =====
+
+    /// Deserialize CREATE request
+    pub fn deserialize_create3args(data: &[u8]) -> Result<CREATE3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = CREATE3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
+
+    /// Create a CREATE error response
+    pub fn create_create_error_response(status: nfsstat3) -> Result<BytesMut> {
+        // For CREATE error, we need status + dir_wcc
+        // dir_wcc = pre_op_attr + post_op_attr
+        let mut buf = Vec::new();
+        (status as i32).pack(&mut buf)?;
+        false.pack(&mut buf)?;  // pre_op_attr = FALSE
+        false.pack(&mut buf)?;  // post_op_attr = FALSE
+        Ok(BytesMut::from(&buf[..]))
+    }
+
     // ===== ACCESS Helpers =====
 
     /// Deserialize ACCESS request

@@ -328,6 +328,45 @@ impl Filesystem for LocalFilesystem {
         Ok(bytes_written as u32)
     }
 
+    fn setattr_size(&self, handle: &FileHandle, size: u64) -> Result<()> {
+        let path = self.resolve_handle(handle)?;
+
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .context(format!("Failed to open file for setattr: {:?}", path))?;
+
+        file.set_len(size)
+            .context("Failed to set file size")?;
+
+        debug!("SETATTR: {:?} size={}", path, size);
+
+        Ok(())
+    }
+
+    fn setattr_mode(&self, handle: &FileHandle, mode: u32) -> Result<()> {
+        let path = self.resolve_handle(handle)?;
+
+        let permissions = fs::Permissions::from_mode(mode);
+        fs::set_permissions(&path, permissions)
+            .context(format!("Failed to set permissions: {:?}", path))?;
+
+        debug!("SETATTR: {:?} mode={:o}", path, mode);
+
+        Ok(())
+    }
+
+    fn setattr_owner(&self, handle: &FileHandle, uid: Option<u32>, gid: Option<u32>) -> Result<()> {
+        let path = self.resolve_handle(handle)?;
+
+        // Note: chown requires root privileges on Unix systems
+        // For now, we'll just log this and return success
+        // In production, you might want to use nix::unistd::chown
+        debug!("SETATTR: {:?} uid={:?} gid={:?} (not implemented)", path, uid, gid);
+
+        Ok(())
+    }
+
     fn create(&self, dir_handle: &FileHandle, name: &str, mode: u32) -> Result<FileHandle> {
         let dir_path = self.resolve_handle(dir_handle)?;
 

@@ -11,8 +11,5 @@ test:
 lint:
 	$(EARTHLY) +lint
 
-image:
-	$(EARTHLY) +dev-image
-
 clean:
 	rm -rf target build

@@ -48,7 +48,7 @@ fn register_services(registry: &portmap::Registry, port: u32) {
         port,
     };
     registry.set(&nfs_tcp);
-    println!("  ✓ NFS v3 (TCP) on port {} (GETATTR implemented)", port);
+    println!("  ✓ NFS v3 (TCP) on port {}", port);
 
     println!();
 }
@@ -68,7 +68,6 @@ async fn main() -> Result<()> {
     println!("- FSAL: File System Abstraction Layer");
     println!();
     println!("Starting RPC server on 0.0.0.0:4000");
-    println!("Phase 3: NFS GETATTR implementation");
     println!();
 
     // Initialize FSAL (File System Abstraction Layer)

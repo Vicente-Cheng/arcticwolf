@@ -151,6 +151,28 @@ pub trait Filesystem: Send + Sync {
     /// Number of bytes actually written
     fn write(&self, handle: &FileHandle, offset: u64, data: &[u8]) -> Result<u32>;
 
+    /// Set file size (truncate/extend)
+    ///
+    /// # Arguments
+    /// * `handle` - File handle
+    /// * `size` - New size in bytes
+    fn setattr_size(&self, handle: &FileHandle, size: u64) -> Result<()>;
+
+    /// Set file mode (permissions)
+    ///
+    /// # Arguments
+    /// * `handle` - File handle
+    /// * `mode` - New file mode (permissions)
+    fn setattr_mode(&self, handle: &FileHandle, mode: u32) -> Result<()>;
+
+    /// Set file owner (uid/gid)
+    ///
+    /// # Arguments
+    /// * `handle` - File handle
+    /// * `uid` - New user ID (None to keep current)
+    /// * `gid` - New group ID (None to keep current)
+    fn setattr_owner(&self, handle: &FileHandle, uid: Option<u32>, gid: Option<u32>) -> Result<()>;
+
     /// Create a file
     ///
     /// # Arguments

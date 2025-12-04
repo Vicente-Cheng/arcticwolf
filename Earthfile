@@ -42,9 +42,3 @@ lint:
     RUN rustup component add clippy rustfmt
     RUN cargo fmt -- --check
     RUN cargo clippy -- -D warnings
-
-# earthly +dev-image
-dev-image:
-    FROM +common
-    RUN cargo build --release
-    SAVE IMAGE nfs-like-server:dev

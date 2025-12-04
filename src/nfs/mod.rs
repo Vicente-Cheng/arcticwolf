@@ -5,6 +5,7 @@
 
 pub mod dispatcher;
 mod access;
+mod create;
 mod fsinfo;
 mod fsstat;
 mod getattr;
@@ -13,5 +14,7 @@ mod null;
 mod pathconf;
 mod read;
 mod readdir;
+mod setattr;
+mod write;
 
 pub use dispatcher::dispatch;

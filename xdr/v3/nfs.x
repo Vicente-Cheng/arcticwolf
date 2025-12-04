@@ -115,6 +115,111 @@ union GETATTR3res switch (nfsstat3 status) {
         void;
 };
 
+/* ===== SETATTR Procedure (2) ===== */
+
+enum time_how {
+    DONT_CHANGE = 0,
+    SET_TO_SERVER_TIME = 1,
+    SET_TO_CLIENT_TIME = 2
+};
+
+enum set_mode3_how {
+    DONT_SET_MODE = 0,
+    SET_MODE = 1
+};
+
+union set_mode3 switch (set_mode3_how set_it) {
+    case SET_MODE:
+        uint32 mode;
+    default:
+        void;
+};
+
+enum set_uid3_how {
+    DONT_SET_UID = 0,
+    SET_UID = 1
+};
+
+union set_uid3 switch (set_uid3_how set_it) {
+    case SET_UID:
+        uint32 uid;
+    default:
+        void;
+};
+
+enum set_gid3_how {
+    DONT_SET_GID = 0,
+    SET_GID = 1
+};
+
+union set_gid3 switch (set_gid3_how set_it) {
+    case SET_GID:
+        uint32 gid;
+    default:
+        void;
+};
+
+enum set_size3_how {
+    DONT_SET_SIZE = 0,
+    SET_SIZE = 1
+};
+
+union set_size3 switch (set_size3_how set_it) {
+    case SET_SIZE:
+        uint64 size;
+    default:
+        void;
+};
+
+union set_atime switch (time_how set_it) {
+    case SET_TO_CLIENT_TIME:
+        nfstime3 atime;
+    default:
+        void;
+};
+
+union set_mtime switch (time_how set_it) {
+    case SET_TO_CLIENT_TIME:
+        nfstime3 mtime;
+    default:
+        void;
+};
+
+struct sattr3 {
+    set_mode3 mode;
+    set_uid3 uid;
+    set_gid3 gid;
+    set_size3 size;
+    set_atime atime;
+    set_mtime mtime;
+};
+
+struct sattrguard3 {
+    bool check;
+    nfstime3 obj_ctime;
+};
+
+struct SETATTR3args {
+    fhandle3 object;
+    sattr3 new_attributes;
+    sattrguard3 guard;
+};
+
+struct SETATTR3resok {
+    fattr3 obj_wcc;
+};
+
+struct SETATTR3resfail {
+    fattr3 obj_wcc;
+};
+
+union SETATTR3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        SETATTR3resok resok;
+    default:
+        SETATTR3resfail resfail;
+};
+
 /* ===== LOOKUP Procedure (3) ===== */
 
 struct LOOKUP3args {
@@ -163,6 +268,80 @@ union READ3res switch (nfsstat3 status) {
         READ3resok resok;
     default:
         READ3resfail resfail;
+};
+
+/* ===== WRITE Procedure (7) ===== */
+
+enum stable_how {
+    UNSTABLE  = 0,
+    DATA_SYNC = 1,
+    FILE_SYNC = 2
+};
+
+struct WRITE3args {
+    fhandle3 file;
+    uint64 offset;
+    uint32 count;
+    stable_how stable;
+    opaque data<>;
+};
+
+struct WRITE3resok {
+    fattr3 file_wcc_before;
+    fattr3 file_wcc_after;
+    uint32 count;
+    stable_how committed;
+    writeverf3 verf;
+};
+
+struct WRITE3resfail {
+    fattr3 file_wcc;
+};
+
+union WRITE3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        WRITE3resok resok;
+    default:
+        WRITE3resfail resfail;
+};
+
+/* ===== CREATE Procedure (8) ===== */
+
+enum createmode3 {
+    UNCHECKED = 0,
+    GUARDED = 1,
+    EXCLUSIVE = 2
+};
+
+union createhow3 switch (createmode3 mode) {
+    case UNCHECKED:
+    case GUARDED:
+        sattr3 obj_attributes;
+    case EXCLUSIVE:
+        createverf3 verf;
+};
+
+struct CREATE3args {
+    fhandle3 where_dir;
+    filename3 name;
+    createhow3 how;
+};
+
+struct CREATE3resok {
+    fhandle3 object;
+    fattr3 obj_attributes;
+    fattr3 dir_wcc;
+};
+
+struct CREATE3resfail {
+    fattr3 dir_wcc;
+};
+
+union CREATE3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        CREATE3resok resok;
+    default:
+        CREATE3resfail resfail;
 };
 
 /* ===== ACCESS Procedure (4) ===== */
