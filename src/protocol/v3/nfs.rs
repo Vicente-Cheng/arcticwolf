@@ -446,4 +446,11 @@ impl NfsMessage {
         (status as i32).pack(&mut buf)?;
         Ok(BytesMut::from(&buf[..]))
     }
+
+    /// Deserialize REMOVE3args from XDR bytes
+    pub fn deserialize_remove3args(data: &[u8]) -> Result<REMOVE3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = REMOVE3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
 }

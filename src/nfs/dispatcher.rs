@@ -9,7 +9,7 @@ use tracing::{debug, warn};
 use crate::fsal::Filesystem;
 use crate::protocol::v3::rpc::rpc_call_msg;
 
-use super::{access, create, fsinfo, fsstat, getattr, lookup, null, pathconf, read, readdir, readdirplus, setattr, write};
+use super::{access, create, fsinfo, fsstat, getattr, lookup, null, pathconf, read, readdir, readdirplus, remove, setattr, write};
 
 /// Dispatch NFS procedure call to appropriate handler
 ///
@@ -97,6 +97,10 @@ pub fn dispatch(
             // MKDIR - create directory
             warn!("NFS MKDIR not yet implemented");
             create_notsupp_response(xid)
+        }
+        12 => {
+            // REMOVE - remove file
+            remove::handle_remove(xid, args_data, filesystem)
         }
         _ => {
             warn!("Unknown NFS procedure: {}", procedure);

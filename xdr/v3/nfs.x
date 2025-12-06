@@ -344,6 +344,28 @@ union CREATE3res switch (nfsstat3 status) {
         CREATE3resfail resfail;
 };
 
+/* ===== REMOVE Procedure (12) ===== */
+
+struct REMOVE3args {
+    fhandle3 dir;
+    filename3 name;
+};
+
+struct REMOVE3resok {
+    fattr3 dir_wcc;  /* post_op_attr for directory */
+};
+
+struct REMOVE3resfail {
+    fattr3 dir_wcc;  /* post_op_attr for directory */
+};
+
+union REMOVE3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        REMOVE3resok resok;
+    default:
+        REMOVE3resfail resfail;
+};
+
 /* ===== ACCESS Procedure (4) ===== */
 
 const ACCESS3_READ    = 0x0001;

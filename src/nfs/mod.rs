@@ -15,6 +15,7 @@ mod pathconf;
 mod read;
 mod readdir;
 mod readdirplus;
+mod remove;
 mod setattr;
 mod write;
 
