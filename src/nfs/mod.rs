@@ -16,10 +16,12 @@ mod pathconf;
 mod read;
 mod readdir;
 mod readdirplus;
+mod readlink;
 mod remove;
 mod rename;
 mod rmdir;
 mod setattr;
+mod symlink;
 mod write;
 
 pub use dispatcher::dispatch;

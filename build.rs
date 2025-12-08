@@ -98,6 +98,14 @@ fn main() {
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum RENAME3res",
                 "#[derive( Clone , Debug , Eq , PartialEq )] pub enum RENAME3res"
             );
+            generated_code = generated_code.replace(
+                "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum READLINK3res",
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum READLINK3res"
+            );
+            generated_code = generated_code.replace(
+                "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum SYMLINK3res",
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum SYMLINK3res"
+            );
         }
 
         fs::write(&output_path, generated_code.as_bytes())

@@ -9,7 +9,7 @@ use tracing::{debug, warn};
 use crate::fsal::Filesystem;
 use crate::protocol::v3::rpc::rpc_call_msg;
 
-use super::{access, create, fsinfo, fsstat, getattr, lookup, mkdir, null, pathconf, read, readdir, readdirplus, remove, rename, rmdir, setattr, write};
+use super::{access, create, fsinfo, fsstat, getattr, lookup, mkdir, null, pathconf, read, readdir, readdirplus, readlink, remove, rename, rmdir, setattr, symlink, write};
 
 /// Dispatch NFS procedure call to appropriate handler
 ///
@@ -61,6 +61,10 @@ pub fn dispatch(
             // ACCESS - check file access permissions
             access::handle_access(xid, args_data, filesystem)
         }
+        5 => {
+            // READLINK - read symbolic link
+            readlink::handle_readlink(xid, args_data, filesystem)
+        }
         6 => {
             // READ - read from file
             read::handle_read(xid, args_data, filesystem)
@@ -96,6 +100,10 @@ pub fn dispatch(
         9 => {
             // MKDIR - create directory
             mkdir::handle_mkdir(xid, args_data, filesystem)
+        }
+        10 => {
+            // SYMLINK - create symbolic link
+            symlink::handle_symlink(xid, args_data, filesystem)
         }
         12 => {
             // REMOVE - remove file

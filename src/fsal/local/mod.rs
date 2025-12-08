@@ -501,6 +501,61 @@ impl Filesystem for LocalFilesystem {
 
         Ok(())
     }
+
+    fn symlink(&self, dir_handle: &FileHandle, name: &str, target: &str) -> Result<FileHandle> {
+        let dir_path = self.resolve_handle(dir_handle)?;
+
+        // Security: prevent path traversal in symlink name
+        if name.contains('/') || name.contains("..") {
+            return Err(anyhow!("Invalid symlink name: {}", name));
+        }
+
+        let symlink_path = dir_path.join(name);
+
+        // Validate symlink path is within export root
+        self.validate_path(&symlink_path)?;
+
+        // Check if file/symlink already exists
+        if symlink_path.exists() {
+            return Err(anyhow!("File or symlink already exists: {:?}", symlink_path));
+        }
+
+        // Create symbolic link
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(target, &symlink_path)
+            .context(format!("Failed to create symlink {:?} -> {}", symlink_path, target))?;
+
+        #[cfg(not(unix))]
+        return Err(anyhow!("Symbolic links are only supported on Unix systems"));
+
+        debug!("SYMLINK: {:?} -> {}", symlink_path, target);
+
+        // Create handle for the new symlink
+        let handle = self.handle_manager.create_handle(symlink_path.clone());
+        Ok(handle)
+    }
+
+    fn readlink(&self, handle: &FileHandle) -> Result<String> {
+        let path = self.resolve_handle(handle)?;
+
+        // Verify the path is a symlink
+        let metadata = fs::symlink_metadata(&path)
+            .context(format!("Failed to get metadata for {:?}", path))?;
+
+        if !metadata.file_type().is_symlink() {
+            return Err(anyhow!("Not a symbolic link: {:?}", path));
+        }
+
+        // Read the symlink target
+        let target = fs::read_link(&path)
+            .context(format!("Failed to read symlink {:?}", path))?;
+
+        let target_str = target.to_string_lossy().to_string();
+
+        debug!("READLINK: {:?} -> {}", path, target_str);
+
+        Ok(target_str)
+    }
 }
 
 #[cfg(test)]

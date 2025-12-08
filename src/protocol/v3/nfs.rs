@@ -474,4 +474,18 @@ impl NfsMessage {
         let (args, _bytes_read) = RENAME3args::unpack(&mut cursor)?;
         Ok(args)
     }
+
+    /// Deserialize READLINK3args from XDR bytes
+    pub fn deserialize_readlink3args(data: &[u8]) -> Result<READLINK3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = READLINK3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
+
+    /// Deserialize SYMLINK3args from XDR bytes
+    pub fn deserialize_symlink3args(data: &[u8]) -> Result<SYMLINK3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = SYMLINK3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
 }

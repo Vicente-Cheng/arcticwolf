@@ -439,6 +439,58 @@ union RENAME3res switch (nfsstat3 status) {
         RENAME3resfail resfail;
 };
 
+/* ===== READLINK Procedure (5) ===== */
+
+struct READLINK3args {
+    fhandle3 symlink;
+};
+
+struct READLINK3resok {
+    fattr3 symlink_attributes;  /* post_op_attr */
+    nfspath3 data;              /* symlink target path */
+};
+
+struct READLINK3resfail {
+    fattr3 symlink_attributes;  /* post_op_attr */
+};
+
+union READLINK3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        READLINK3resok resok;
+    default:
+        READLINK3resfail resfail;
+};
+
+/* ===== SYMLINK Procedure (10) ===== */
+
+struct symlinkdata3 {
+    sattr3 symlink_attributes;
+    nfspath3 symlink_data;      /* target path */
+};
+
+struct SYMLINK3args {
+    fhandle3 where_dir;         /* directory handle */
+    filename3 name;             /* symlink name */
+    symlinkdata3 symlink;
+};
+
+struct SYMLINK3resok {
+    fhandle3 obj;               /* post_op_fh3 - new symlink handle */
+    fattr3 obj_attributes;      /* post_op_attr - new symlink attributes */
+    fattr3 dir_wcc;             /* wcc_data - parent directory */
+};
+
+struct SYMLINK3resfail {
+    fattr3 dir_wcc;             /* wcc_data - parent directory */
+};
+
+union SYMLINK3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        SYMLINK3resok resok;
+    default:
+        SYMLINK3resfail resfail;
+};
+
 /* ===== ACCESS Procedure (4) ===== */
 
 const ACCESS3_READ    = 0x0001;

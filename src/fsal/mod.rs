@@ -223,6 +223,23 @@ pub trait Filesystem: Send + Sync {
         to_dir_handle: &FileHandle,
         to_name: &str,
     ) -> Result<()>;
+
+    /// Create a symbolic link
+    ///
+    /// # Arguments
+    /// * `dir_handle` - Parent directory handle
+    /// * `name` - Symlink name
+    /// * `target` - Target path the symlink points to
+    fn symlink(&self, dir_handle: &FileHandle, name: &str, target: &str) -> Result<FileHandle>;
+
+    /// Read a symbolic link
+    ///
+    /// # Arguments
+    /// * `handle` - Symlink file handle
+    ///
+    /// # Returns
+    /// Target path the symlink points to
+    fn readlink(&self, handle: &FileHandle) -> Result<String>;
 }
 
 /// Filesystem backend types
