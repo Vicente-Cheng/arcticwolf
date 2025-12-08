@@ -10,12 +10,14 @@ mod fsinfo;
 mod fsstat;
 mod getattr;
 mod lookup;
+mod mkdir;
 mod null;
 mod pathconf;
 mod read;
 mod readdir;
 mod readdirplus;
 mod remove;
+mod rmdir;
 mod setattr;
 mod write;
 

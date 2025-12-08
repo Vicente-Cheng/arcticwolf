@@ -366,6 +366,53 @@ union REMOVE3res switch (nfsstat3 status) {
         REMOVE3resfail resfail;
 };
 
+/* ===== MKDIR Procedure (9) ===== */
+
+struct MKDIR3args {
+    fhandle3 where_dir;
+    filename3 name;
+    sattr3 attributes;
+};
+
+struct MKDIR3resok {
+    fhandle3 obj;            /* post_op_fh3 - new directory handle */
+    fattr3 obj_attributes;   /* post_op_attr - new directory attributes */
+    fattr3 dir_wcc;          /* wcc_data - parent directory wcc */
+};
+
+struct MKDIR3resfail {
+    fattr3 dir_wcc;          /* wcc_data - parent directory wcc */
+};
+
+union MKDIR3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        MKDIR3resok resok;
+    default:
+        MKDIR3resfail resfail;
+};
+
+/* ===== RMDIR Procedure (13) ===== */
+
+struct RMDIR3args {
+    fhandle3 dir;
+    filename3 name;
+};
+
+struct RMDIR3resok {
+    fattr3 dir_wcc;  /* wcc_data for parent directory */
+};
+
+struct RMDIR3resfail {
+    fattr3 dir_wcc;  /* wcc_data for parent directory */
+};
+
+union RMDIR3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        RMDIR3resok resok;
+    default:
+        RMDIR3resfail resfail;
+};
+
 /* ===== ACCESS Procedure (4) ===== */
 
 const ACCESS3_READ    = 0x0001;

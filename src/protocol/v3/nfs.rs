@@ -453,4 +453,18 @@ impl NfsMessage {
         let (args, _bytes_read) = REMOVE3args::unpack(&mut cursor)?;
         Ok(args)
     }
+
+    /// Deserialize MKDIR3args from XDR bytes
+    pub fn deserialize_mkdir3args(data: &[u8]) -> Result<MKDIR3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = MKDIR3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
+
+    /// Deserialize RMDIR3args from XDR bytes
+    pub fn deserialize_rmdir3args(data: &[u8]) -> Result<RMDIR3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = RMDIR3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
 }
