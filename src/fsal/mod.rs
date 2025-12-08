@@ -240,6 +240,17 @@ pub trait Filesystem: Send + Sync {
     /// # Returns
     /// Target path the symlink points to
     fn readlink(&self, handle: &FileHandle) -> Result<String>;
+
+    /// Create a hard link
+    ///
+    /// # Arguments
+    /// * `file_handle` - Source file handle
+    /// * `dir_handle` - Target directory handle
+    /// * `name` - New link name
+    ///
+    /// # Returns
+    /// The file handle (should be the same as source file handle since they share the same inode)
+    fn link(&self, file_handle: &FileHandle, dir_handle: &FileHandle, name: &str) -> Result<FileHandle>;
 }
 
 /// Filesystem backend types

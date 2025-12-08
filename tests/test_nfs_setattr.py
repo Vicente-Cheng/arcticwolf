@@ -291,10 +291,13 @@ def test_nfs_setattr():
     setattr_args += struct.pack('>I', 0)     # atime discriminator = DONT_CHANGE
     setattr_args += struct.pack('>I', 0)     # mtime discriminator = DONT_CHANGE
 
-    # sattrguard3: guard
-    setattr_args += struct.pack('>I', 0)     # check = FALSE
-    setattr_args += struct.pack('>I', 0)     # obj_ctime.seconds
-    setattr_args += struct.pack('>I', 0)     # obj_ctime.nseconds
+    # sattrguard3: guard (union, not struct!)
+    # When check=DONT_CHECK (0), only send the discriminator, NO obj_ctime
+    setattr_args += struct.pack('>I', 0)     # check discriminator = DONT_CHECK (0)
+    # If check were CHECK (1), we would send:
+    # setattr_args += struct.pack('>I', 1)     # check discriminator = CHECK (1)
+    # setattr_args += struct.pack('>I', seconds)  # obj_ctime.seconds
+    # setattr_args += struct.pack('>I', nseconds) # obj_ctime.nseconds
 
     print(f"  Setting size to {new_size} bytes")
 

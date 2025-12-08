@@ -488,4 +488,11 @@ impl NfsMessage {
         let (args, _bytes_read) = SYMLINK3args::unpack(&mut cursor)?;
         Ok(args)
     }
+
+    /// Deserialize LINK3args from XDR bytes
+    pub fn deserialize_link3args(data: &[u8]) -> Result<LINK3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = LINK3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
 }

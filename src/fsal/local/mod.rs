@@ -556,6 +556,44 @@ impl Filesystem for LocalFilesystem {
 
         Ok(target_str)
     }
+
+    fn link(&self, file_handle: &FileHandle, dir_handle: &FileHandle, name: &str) -> Result<FileHandle> {
+        let file_path = self.resolve_handle(file_handle)?;
+        let dir_path = self.resolve_handle(dir_handle)?;
+
+        // Security: prevent path traversal in link name
+        if name.contains('/') || name.contains("..") {
+            return Err(anyhow!("Invalid link name: {}", name));
+        }
+
+        let link_path = dir_path.join(name);
+
+        // Validate link path is within export root
+        self.validate_path(&link_path)?;
+
+        // Check if target already exists
+        if link_path.exists() {
+            return Err(anyhow!("File already exists: {:?}", link_path));
+        }
+
+        // Get source file metadata to check if it's a directory
+        let metadata = fs::metadata(&file_path)
+            .context(format!("Failed to get metadata for {:?}", file_path))?;
+
+        // Cannot create hard link to a directory (POSIX restriction)
+        if metadata.is_dir() {
+            return Err(anyhow!("Cannot create hard link to directory: {:?}", file_path));
+        }
+
+        // Create hard link
+        fs::hard_link(&file_path, &link_path)
+            .context(format!("Failed to create hard link {:?} -> {:?}", link_path, file_path))?;
+
+        debug!("LINK: {:?} -> {:?}", link_path, file_path);
+
+        // Return the same file handle (hard links share the same inode)
+        Ok(file_handle.clone())
+    }
 }
 
 #[cfg(test)]

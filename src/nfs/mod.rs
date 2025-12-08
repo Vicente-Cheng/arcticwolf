@@ -9,6 +9,7 @@ mod create;
 mod fsinfo;
 mod fsstat;
 mod getattr;
+mod link;
 mod lookup;
 mod mkdir;
 mod null;

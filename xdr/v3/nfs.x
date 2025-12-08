@@ -194,9 +194,16 @@ struct sattr3 {
     set_mtime mtime;
 };
 
-struct sattrguard3 {
-    bool check;
-    nfstime3 obj_ctime;
+enum sattrguard3_how {
+    DONT_CHECK = 0,
+    CHECK = 1
+};
+
+union sattrguard3 switch (sattrguard3_how check) {
+    case CHECK:
+        nfstime3 obj_ctime;
+    default:
+        void;
 };
 
 struct SETATTR3args {
@@ -489,6 +496,31 @@ union SYMLINK3res switch (nfsstat3 status) {
         SYMLINK3resok resok;
     default:
         SYMLINK3resfail resfail;
+};
+
+/* ===== LINK Procedure (15) ===== */
+
+struct LINK3args {
+    fhandle3 file;              /* source file handle */
+    fhandle3 link_dir;          /* target directory handle */
+    filename3 name;             /* new link name */
+};
+
+struct LINK3resok {
+    fattr3 file_attributes;     /* post_op_attr - source file attributes */
+    fattr3 linkdir_wcc;         /* wcc_data - target directory */
+};
+
+struct LINK3resfail {
+    fattr3 file_attributes;     /* post_op_attr - source file attributes */
+    fattr3 linkdir_wcc;         /* wcc_data - target directory */
+};
+
+union LINK3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        LINK3resok resok;
+    default:
+        LINK3resfail resfail;
 };
 
 /* ===== ACCESS Procedure (4) ===== */
