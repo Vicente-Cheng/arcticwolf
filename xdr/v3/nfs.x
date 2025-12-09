@@ -498,6 +498,50 @@ union SYMLINK3res switch (nfsstat3 status) {
         SYMLINK3resfail resfail;
 };
 
+/* ===== MKNOD Procedure (11) ===== */
+
+/* Device data for character and block devices */
+struct devicedata3 {
+    sattr3 dev_attributes;
+    uint32 major;               /* major device number */
+    uint32 minor;               /* minor device number */
+};
+
+/* MKNOD data - union based on file type */
+union mknoddata3 switch (ftype3 type) {
+    case NF3CHR:
+        devicedata3 chr_device;
+    case NF3BLK:
+        devicedata3 blk_device;
+    case NF3SOCK:
+        sattr3 sock_attributes;
+    case NF3FIFO:
+        sattr3 pipe_attributes;
+};
+
+struct MKNOD3args {
+    fhandle3 where_dir;         /* directory handle */
+    filename3 name;             /* name of special file to create */
+    mknoddata3 what;
+};
+
+struct MKNOD3resok {
+    fhandle3 obj;               /* post_op_fh3 - new object handle */
+    fattr3 obj_attributes;      /* post_op_attr - new object attributes */
+    fattr3 dir_wcc;             /* wcc_data - parent directory */
+};
+
+struct MKNOD3resfail {
+    fattr3 dir_wcc;             /* wcc_data - parent directory */
+};
+
+union MKNOD3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        MKNOD3resok resok;
+    default:
+        MKNOD3resfail resfail;
+};
+
 /* ===== LINK Procedure (15) ===== */
 
 struct LINK3args {

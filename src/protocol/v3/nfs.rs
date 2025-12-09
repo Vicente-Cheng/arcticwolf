@@ -502,4 +502,11 @@ impl NfsMessage {
         let (args, _bytes_read) = COMMIT3args::unpack(&mut cursor)?;
         Ok(args)
     }
+
+    /// Deserialize MKNOD3args from XDR bytes
+    pub fn deserialize_mknod3args(data: &[u8]) -> Result<MKNOD3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = MKNOD3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
 }

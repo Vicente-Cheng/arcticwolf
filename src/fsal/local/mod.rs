@@ -130,6 +130,31 @@ impl LocalFilesystem {
 
     /// Convert std::fs::Metadata to FileAttributes
     fn metadata_to_attr(&self, metadata: &fs::Metadata, path: &Path) -> FileAttributes {
+        #[cfg(unix)]
+        let ftype = {
+            use std::os::unix::fs::FileTypeExt;
+            let file_type = metadata.file_type();
+
+            if file_type.is_dir() {
+                FileType::Directory
+            } else if file_type.is_file() {
+                FileType::RegularFile
+            } else if file_type.is_symlink() {
+                FileType::SymbolicLink
+            } else if file_type.is_fifo() {
+                FileType::NamedPipe
+            } else if file_type.is_char_device() {
+                FileType::CharDevice
+            } else if file_type.is_block_device() {
+                FileType::BlockDevice
+            } else if file_type.is_socket() {
+                FileType::Socket
+            } else {
+                FileType::RegularFile // Default
+            }
+        };
+
+        #[cfg(not(unix))]
         let ftype = if metadata.is_dir() {
             FileType::Directory
         } else if metadata.is_file() {
@@ -255,6 +280,31 @@ impl Filesystem for LocalFilesystem {
             let entry_metadata = entry.metadata()
                 .context(format!("Failed to get metadata for: {:?}", entry_path))?;
 
+            #[cfg(unix)]
+            let file_type = {
+                use std::os::unix::fs::FileTypeExt;
+                let ft = entry_metadata.file_type();
+
+                if ft.is_dir() {
+                    FileType::Directory
+                } else if ft.is_file() {
+                    FileType::RegularFile
+                } else if ft.is_symlink() {
+                    FileType::SymbolicLink
+                } else if ft.is_fifo() {
+                    FileType::NamedPipe
+                } else if ft.is_char_device() {
+                    FileType::CharDevice
+                } else if ft.is_block_device() {
+                    FileType::BlockDevice
+                } else if ft.is_socket() {
+                    FileType::Socket
+                } else {
+                    FileType::RegularFile // Default
+                }
+            };
+
+            #[cfg(not(unix))]
             let file_type = if entry_metadata.is_dir() {
                 FileType::Directory
             } else if entry_metadata.is_file() {
@@ -620,6 +670,76 @@ impl Filesystem for LocalFilesystem {
         );
 
         Ok(())
+    }
+
+    fn mknod(
+        &self,
+        dir_handle: &FileHandle,
+        name: &str,
+        file_type: FileType,
+        mode: u32,
+        rdev: (u32, u32),
+    ) -> Result<FileHandle> {
+        let dir_path = self.resolve_handle(dir_handle)?;
+        let file_path = dir_path.join(name);
+
+        debug!(
+            "MKNOD: {:?}/{} type={:?} mode={:o} rdev=({}, {})",
+            dir_path, name, file_type, mode, rdev.0, rdev.1
+        );
+
+        // On Unix systems, we can create special files using libc functions
+        // For portability, we'll use std::os::unix::fs
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            use std::os::unix::io::AsRawFd;
+
+            match file_type {
+                FileType::NamedPipe => {
+                    // Create FIFO using mkfifo
+                    use std::ffi::CString;
+                    let c_path = CString::new(file_path.to_str().unwrap())?;
+                    let result = unsafe { libc::mkfifo(c_path.as_ptr(), mode) };
+                    if result != 0 {
+                        return Err(anyhow::anyhow!("Failed to create FIFO: {}", std::io::Error::last_os_error()));
+                    }
+                }
+                FileType::Socket => {
+                    // Unix domain sockets are typically created by bind(), not mknod
+                    // For now, we'll create a placeholder file
+                    // A real implementation would need socket creation logic
+                    return Err(anyhow::anyhow!("Socket creation via MKNOD not fully supported"));
+                }
+                FileType::CharDevice | FileType::BlockDevice => {
+                    // Create device file using mknod
+                    use std::ffi::CString;
+                    let c_path = CString::new(file_path.to_str().unwrap())?;
+                    let dev = libc::makedev(rdev.0, rdev.1);
+                    let mode_with_type = mode | match file_type {
+                        FileType::CharDevice => libc::S_IFCHR,
+                        FileType::BlockDevice => libc::S_IFBLK,
+                        _ => 0,
+                    };
+                    let result = unsafe { libc::mknod(c_path.as_ptr(), mode_with_type, dev) };
+                    if result != 0 {
+                        return Err(anyhow::anyhow!("Failed to create device: {}", std::io::Error::last_os_error()));
+                    }
+                }
+                _ => {
+                    return Err(anyhow::anyhow!("Invalid file type for MKNOD: {:?}", file_type));
+                }
+            }
+        }
+
+        #[cfg(not(unix))]
+        {
+            return Err(anyhow::anyhow!("MKNOD is only supported on Unix systems"));
+        }
+
+        // Create handle for the new special file
+        let handle = self.handle_manager.create_handle(file_path.clone());
+        Ok(handle)
     }
 }
 

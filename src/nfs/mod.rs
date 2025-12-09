@@ -13,6 +13,7 @@ mod getattr;
 mod link;
 mod lookup;
 mod mkdir;
+mod mknod;
 mod null;
 mod pathconf;
 mod read;

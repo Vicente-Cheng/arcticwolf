@@ -265,6 +265,26 @@ pub trait Filesystem: Send + Sync {
     /// # Returns
     /// Ok if data is committed to stable storage
     fn commit(&self, handle: &FileHandle, offset: u64, count: u32) -> Result<()>;
+
+    /// Create a special file (device, FIFO, socket)
+    ///
+    /// # Arguments
+    /// * `dir_handle` - Parent directory handle
+    /// * `name` - Name of special file to create
+    /// * `file_type` - Type of special file (BlockDevice, CharDevice, Socket, NamedPipe)
+    /// * `mode` - File permissions
+    /// * `rdev` - Device numbers (major, minor) for device files, ignored for FIFO/Socket
+    ///
+    /// # Returns
+    /// File handle of created special file
+    fn mknod(
+        &self,
+        dir_handle: &FileHandle,
+        name: &str,
+        file_type: FileType,
+        mode: u32,
+        rdev: (u32, u32),
+    ) -> Result<FileHandle>;
 }
 
 /// Filesystem backend types

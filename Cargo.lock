@@ -30,6 +30,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bytes",
+ "libc",
  "tempfile",
  "thiserror",
  "tokio",
