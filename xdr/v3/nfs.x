@@ -194,9 +194,16 @@ struct sattr3 {
     set_mtime mtime;
 };
 
-struct sattrguard3 {
-    bool check;
-    nfstime3 obj_ctime;
+enum sattrguard3_how {
+    DONT_CHECK = 0,
+    CHECK = 1
+};
+
+union sattrguard3 switch (sattrguard3_how check) {
+    case CHECK:
+        nfstime3 obj_ctime;
+    default:
+        void;
 };
 
 struct SETATTR3args {
@@ -364,6 +371,200 @@ union REMOVE3res switch (nfsstat3 status) {
         REMOVE3resok resok;
     default:
         REMOVE3resfail resfail;
+};
+
+/* ===== MKDIR Procedure (9) ===== */
+
+struct MKDIR3args {
+    fhandle3 where_dir;
+    filename3 name;
+    sattr3 attributes;
+};
+
+struct MKDIR3resok {
+    fhandle3 obj;            /* post_op_fh3 - new directory handle */
+    fattr3 obj_attributes;   /* post_op_attr - new directory attributes */
+    fattr3 dir_wcc;          /* wcc_data - parent directory wcc */
+};
+
+struct MKDIR3resfail {
+    fattr3 dir_wcc;          /* wcc_data - parent directory wcc */
+};
+
+union MKDIR3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        MKDIR3resok resok;
+    default:
+        MKDIR3resfail resfail;
+};
+
+/* ===== RMDIR Procedure (13) ===== */
+
+struct RMDIR3args {
+    fhandle3 dir;
+    filename3 name;
+};
+
+struct RMDIR3resok {
+    fattr3 dir_wcc;  /* wcc_data for parent directory */
+};
+
+struct RMDIR3resfail {
+    fattr3 dir_wcc;  /* wcc_data for parent directory */
+};
+
+union RMDIR3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        RMDIR3resok resok;
+    default:
+        RMDIR3resfail resfail;
+};
+
+/* ===== RENAME Procedure (14) ===== */
+
+struct RENAME3args {
+    fhandle3 from_dir;
+    filename3 from_name;
+    fhandle3 to_dir;
+    filename3 to_name;
+};
+
+struct RENAME3resok {
+    fattr3 fromdir_wcc;   /* wcc_data for source directory */
+    fattr3 todir_wcc;     /* wcc_data for target directory */
+};
+
+struct RENAME3resfail {
+    fattr3 fromdir_wcc;   /* wcc_data for source directory */
+    fattr3 todir_wcc;     /* wcc_data for target directory */
+};
+
+union RENAME3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        RENAME3resok resok;
+    default:
+        RENAME3resfail resfail;
+};
+
+/* ===== READLINK Procedure (5) ===== */
+
+struct READLINK3args {
+    fhandle3 symlink;
+};
+
+struct READLINK3resok {
+    fattr3 symlink_attributes;  /* post_op_attr */
+    nfspath3 data;              /* symlink target path */
+};
+
+struct READLINK3resfail {
+    fattr3 symlink_attributes;  /* post_op_attr */
+};
+
+union READLINK3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        READLINK3resok resok;
+    default:
+        READLINK3resfail resfail;
+};
+
+/* ===== SYMLINK Procedure (10) ===== */
+
+struct symlinkdata3 {
+    sattr3 symlink_attributes;
+    nfspath3 symlink_data;      /* target path */
+};
+
+struct SYMLINK3args {
+    fhandle3 where_dir;         /* directory handle */
+    filename3 name;             /* symlink name */
+    symlinkdata3 symlink;
+};
+
+struct SYMLINK3resok {
+    fhandle3 obj;               /* post_op_fh3 - new symlink handle */
+    fattr3 obj_attributes;      /* post_op_attr - new symlink attributes */
+    fattr3 dir_wcc;             /* wcc_data - parent directory */
+};
+
+struct SYMLINK3resfail {
+    fattr3 dir_wcc;             /* wcc_data - parent directory */
+};
+
+union SYMLINK3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        SYMLINK3resok resok;
+    default:
+        SYMLINK3resfail resfail;
+};
+
+/* ===== MKNOD Procedure (11) ===== */
+
+/* Device data for character and block devices */
+struct devicedata3 {
+    sattr3 dev_attributes;
+    uint32 major;               /* major device number */
+    uint32 minor;               /* minor device number */
+};
+
+/* MKNOD data - union based on file type */
+union mknoddata3 switch (ftype3 type) {
+    case NF3CHR:
+        devicedata3 chr_device;
+    case NF3BLK:
+        devicedata3 blk_device;
+    case NF3SOCK:
+        sattr3 sock_attributes;
+    case NF3FIFO:
+        sattr3 pipe_attributes;
+};
+
+struct MKNOD3args {
+    fhandle3 where_dir;         /* directory handle */
+    filename3 name;             /* name of special file to create */
+    mknoddata3 what;
+};
+
+struct MKNOD3resok {
+    fhandle3 obj;               /* post_op_fh3 - new object handle */
+    fattr3 obj_attributes;      /* post_op_attr - new object attributes */
+    fattr3 dir_wcc;             /* wcc_data - parent directory */
+};
+
+struct MKNOD3resfail {
+    fattr3 dir_wcc;             /* wcc_data - parent directory */
+};
+
+union MKNOD3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        MKNOD3resok resok;
+    default:
+        MKNOD3resfail resfail;
+};
+
+/* ===== LINK Procedure (15) ===== */
+
+struct LINK3args {
+    fhandle3 file;              /* source file handle */
+    fhandle3 link_dir;          /* target directory handle */
+    filename3 name;             /* new link name */
+};
+
+struct LINK3resok {
+    fattr3 file_attributes;     /* post_op_attr - source file attributes */
+    fattr3 linkdir_wcc;         /* wcc_data - target directory */
+};
+
+struct LINK3resfail {
+    fattr3 file_attributes;     /* post_op_attr - source file attributes */
+    fattr3 linkdir_wcc;         /* wcc_data - target directory */
+};
+
+union LINK3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        LINK3resok resok;
+    default:
+        LINK3resfail resfail;
 };
 
 /* ===== ACCESS Procedure (4) ===== */
@@ -569,6 +770,30 @@ union PATHCONF3res switch (nfsstat3 status) {
         PATHCONF3resok resok;
     default:
         PATHCONF3resfail resfail;
+};
+
+/* ===== COMMIT Procedure (21) ===== */
+
+struct COMMIT3args {
+    fhandle3 file;
+    uint64 offset;
+    uint32 count;
+};
+
+struct COMMIT3resok {
+    fattr3 file_wcc;           /* wcc_data for file */
+    opaque writeverf[8];       /* write verifier */
+};
+
+struct COMMIT3resfail {
+    fattr3 file_wcc;           /* wcc_data for file */
+};
+
+union COMMIT3res switch (nfsstat3 status) {
+    case NFS3_OK:
+        COMMIT3resok resok;
+    default:
+        COMMIT3resfail resfail;
 };
 
 /* ===== NULL Procedure (0) ===== */

@@ -208,6 +208,83 @@ pub trait Filesystem: Send + Sync {
     /// * `dir_handle` - Parent directory handle
     /// * `name` - Name of directory to remove
     fn rmdir(&self, dir_handle: &FileHandle, name: &str) -> Result<()>;
+
+    /// Rename a file or directory
+    ///
+    /// # Arguments
+    /// * `from_dir_handle` - Source directory handle
+    /// * `from_name` - Source name
+    /// * `to_dir_handle` - Target directory handle
+    /// * `to_name` - Target name
+    fn rename(
+        &self,
+        from_dir_handle: &FileHandle,
+        from_name: &str,
+        to_dir_handle: &FileHandle,
+        to_name: &str,
+    ) -> Result<()>;
+
+    /// Create a symbolic link
+    ///
+    /// # Arguments
+    /// * `dir_handle` - Parent directory handle
+    /// * `name` - Symlink name
+    /// * `target` - Target path the symlink points to
+    fn symlink(&self, dir_handle: &FileHandle, name: &str, target: &str) -> Result<FileHandle>;
+
+    /// Read a symbolic link
+    ///
+    /// # Arguments
+    /// * `handle` - Symlink file handle
+    ///
+    /// # Returns
+    /// Target path the symlink points to
+    fn readlink(&self, handle: &FileHandle) -> Result<String>;
+
+    /// Create a hard link
+    ///
+    /// # Arguments
+    /// * `file_handle` - Source file handle
+    /// * `dir_handle` - Target directory handle
+    /// * `name` - New link name
+    ///
+    /// # Returns
+    /// The file handle (should be the same as source file handle since they share the same inode)
+    fn link(&self, file_handle: &FileHandle, dir_handle: &FileHandle, name: &str) -> Result<FileHandle>;
+
+    /// Commit cached data to stable storage
+    ///
+    /// Ensures that all data for the specified file that was written with WRITE
+    /// procedure calls with stable=UNSTABLE are committed to stable storage.
+    ///
+    /// # Arguments
+    /// * `handle` - File handle
+    /// * `offset` - Starting offset (0 means from beginning)
+    /// * `count` - Number of bytes (0 means to end of file)
+    ///
+    /// # Returns
+    /// Ok if data is committed to stable storage
+    fn commit(&self, handle: &FileHandle, offset: u64, count: u32) -> Result<()>;
+
+    /// Create a special file (device, FIFO, socket)
+    ///
+    /// # Arguments
+    /// * `dir_handle` - Parent directory handle
+    /// * `name` - Name of special file to create
+    /// * `file_type` - Type of special file (BlockDevice, CharDevice, Socket, NamedPipe)
+    /// * `mode` - File permissions
+    /// * `rdev` - Device numbers (major, minor) for device files, ignored for FIFO/Socket
+    ///
+    /// # Returns
+    /// File handle of created special file
+    fn mknod(
+        &self,
+        dir_handle: &FileHandle,
+        name: &str,
+        file_type: FileType,
+        mode: u32,
+        rdev: (u32, u32),
+    ) -> Result<FileHandle>;
 }
 
 /// Filesystem backend types

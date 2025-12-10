@@ -130,6 +130,31 @@ impl LocalFilesystem {
 
     /// Convert std::fs::Metadata to FileAttributes
     fn metadata_to_attr(&self, metadata: &fs::Metadata, path: &Path) -> FileAttributes {
+        #[cfg(unix)]
+        let ftype = {
+            use std::os::unix::fs::FileTypeExt;
+            let file_type = metadata.file_type();
+
+            if file_type.is_dir() {
+                FileType::Directory
+            } else if file_type.is_file() {
+                FileType::RegularFile
+            } else if file_type.is_symlink() {
+                FileType::SymbolicLink
+            } else if file_type.is_fifo() {
+                FileType::NamedPipe
+            } else if file_type.is_char_device() {
+                FileType::CharDevice
+            } else if file_type.is_block_device() {
+                FileType::BlockDevice
+            } else if file_type.is_socket() {
+                FileType::Socket
+            } else {
+                FileType::RegularFile // Default
+            }
+        };
+
+        #[cfg(not(unix))]
         let ftype = if metadata.is_dir() {
             FileType::Directory
         } else if metadata.is_file() {
@@ -255,6 +280,31 @@ impl Filesystem for LocalFilesystem {
             let entry_metadata = entry.metadata()
                 .context(format!("Failed to get metadata for: {:?}", entry_path))?;
 
+            #[cfg(unix)]
+            let file_type = {
+                use std::os::unix::fs::FileTypeExt;
+                let ft = entry_metadata.file_type();
+
+                if ft.is_dir() {
+                    FileType::Directory
+                } else if ft.is_file() {
+                    FileType::RegularFile
+                } else if ft.is_symlink() {
+                    FileType::SymbolicLink
+                } else if ft.is_fifo() {
+                    FileType::NamedPipe
+                } else if ft.is_char_device() {
+                    FileType::CharDevice
+                } else if ft.is_block_device() {
+                    FileType::BlockDevice
+                } else if ft.is_socket() {
+                    FileType::Socket
+                } else {
+                    FileType::RegularFile // Default
+                }
+            };
+
+            #[cfg(not(unix))]
             let file_type = if entry_metadata.is_dir() {
                 FileType::Directory
             } else if entry_metadata.is_file() {
@@ -466,6 +516,230 @@ impl Filesystem for LocalFilesystem {
         debug!("RMDIR: {:?}", full_path);
 
         Ok(())
+    }
+
+    fn rename(
+        &self,
+        from_dir_handle: &FileHandle,
+        from_name: &str,
+        to_dir_handle: &FileHandle,
+        to_name: &str,
+    ) -> Result<()> {
+        let from_dir_path = self.resolve_handle(from_dir_handle)?;
+        let to_dir_path = self.resolve_handle(to_dir_handle)?;
+
+        // Security: prevent path traversal
+        if from_name.contains('/') || from_name.contains("..") {
+            return Err(anyhow!("Invalid source name: {}", from_name));
+        }
+        if to_name.contains('/') || to_name.contains("..") {
+            return Err(anyhow!("Invalid target name: {}", to_name));
+        }
+
+        let from_full_path = from_dir_path.join(from_name);
+        let to_full_path = to_dir_path.join(to_name);
+
+        // Validate both paths are within export root
+        self.validate_path(&from_full_path)?;
+        self.validate_path(&to_full_path)?;
+
+        // Rename/move the file or directory
+        fs::rename(&from_full_path, &to_full_path)
+            .context(format!("Failed to rename {:?} to {:?}", from_full_path, to_full_path))?;
+
+        debug!("RENAME: {:?} -> {:?}", from_full_path, to_full_path);
+
+        Ok(())
+    }
+
+    fn symlink(&self, dir_handle: &FileHandle, name: &str, target: &str) -> Result<FileHandle> {
+        let dir_path = self.resolve_handle(dir_handle)?;
+
+        // Security: prevent path traversal in symlink name
+        if name.contains('/') || name.contains("..") {
+            return Err(anyhow!("Invalid symlink name: {}", name));
+        }
+
+        let symlink_path = dir_path.join(name);
+
+        // Validate symlink path is within export root
+        self.validate_path(&symlink_path)?;
+
+        // Check if file/symlink already exists
+        if symlink_path.exists() {
+            return Err(anyhow!("File or symlink already exists: {:?}", symlink_path));
+        }
+
+        // Create symbolic link
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(target, &symlink_path)
+            .context(format!("Failed to create symlink {:?} -> {}", symlink_path, target))?;
+
+        #[cfg(not(unix))]
+        return Err(anyhow!("Symbolic links are only supported on Unix systems"));
+
+        debug!("SYMLINK: {:?} -> {}", symlink_path, target);
+
+        // Create handle for the new symlink
+        let handle = self.handle_manager.create_handle(symlink_path.clone());
+        Ok(handle)
+    }
+
+    fn readlink(&self, handle: &FileHandle) -> Result<String> {
+        let path = self.resolve_handle(handle)?;
+
+        // Verify the path is a symlink
+        let metadata = fs::symlink_metadata(&path)
+            .context(format!("Failed to get metadata for {:?}", path))?;
+
+        if !metadata.file_type().is_symlink() {
+            return Err(anyhow!("Not a symbolic link: {:?}", path));
+        }
+
+        // Read the symlink target
+        let target = fs::read_link(&path)
+            .context(format!("Failed to read symlink {:?}", path))?;
+
+        let target_str = target.to_string_lossy().to_string();
+
+        debug!("READLINK: {:?} -> {}", path, target_str);
+
+        Ok(target_str)
+    }
+
+    fn link(&self, file_handle: &FileHandle, dir_handle: &FileHandle, name: &str) -> Result<FileHandle> {
+        let file_path = self.resolve_handle(file_handle)?;
+        let dir_path = self.resolve_handle(dir_handle)?;
+
+        // Security: prevent path traversal in link name
+        if name.contains('/') || name.contains("..") {
+            return Err(anyhow!("Invalid link name: {}", name));
+        }
+
+        let link_path = dir_path.join(name);
+
+        // Validate link path is within export root
+        self.validate_path(&link_path)?;
+
+        // Check if target already exists
+        if link_path.exists() {
+            return Err(anyhow!("File already exists: {:?}", link_path));
+        }
+
+        // Get source file metadata to check if it's a directory
+        let metadata = fs::metadata(&file_path)
+            .context(format!("Failed to get metadata for {:?}", file_path))?;
+
+        // Cannot create hard link to a directory (POSIX restriction)
+        if metadata.is_dir() {
+            return Err(anyhow!("Cannot create hard link to directory: {:?}", file_path));
+        }
+
+        // Create hard link
+        fs::hard_link(&file_path, &link_path)
+            .context(format!("Failed to create hard link {:?} -> {:?}", link_path, file_path))?;
+
+        debug!("LINK: {:?} -> {:?}", link_path, file_path);
+
+        // Return the same file handle (hard links share the same inode)
+        Ok(file_handle.clone())
+    }
+
+    fn commit(&self, handle: &FileHandle, offset: u64, count: u32) -> Result<()> {
+        let path = self.resolve_handle(handle)?;
+
+        // Open file for syncing
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .context(format!("Failed to open file for commit: {:?}", path))?;
+
+        // Sync data to disk
+        // Note: For a more sophisticated implementation, we could:
+        // 1. Only sync the specified range (offset, count) if the OS supports it
+        // 2. Use sync_data() instead of sync_all() to skip metadata sync
+        // 3. Track UNSTABLE writes and only sync those
+        //
+        // For now, we sync all data in the file for simplicity
+        file.sync_all()
+            .context(format!("Failed to sync file: {:?}", path))?;
+
+        debug!(
+            "COMMIT: {:?} (offset={}, count={})",
+            path, offset, count
+        );
+
+        Ok(())
+    }
+
+    fn mknod(
+        &self,
+        dir_handle: &FileHandle,
+        name: &str,
+        file_type: FileType,
+        mode: u32,
+        rdev: (u32, u32),
+    ) -> Result<FileHandle> {
+        let dir_path = self.resolve_handle(dir_handle)?;
+        let file_path = dir_path.join(name);
+
+        debug!(
+            "MKNOD: {:?}/{} type={:?} mode={:o} rdev=({}, {})",
+            dir_path, name, file_type, mode, rdev.0, rdev.1
+        );
+
+        // On Unix systems, we can create special files using libc functions
+        // For portability, we'll use std::os::unix::fs
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            use std::os::unix::io::AsRawFd;
+
+            match file_type {
+                FileType::NamedPipe => {
+                    // Create FIFO using mkfifo
+                    use std::ffi::CString;
+                    let c_path = CString::new(file_path.to_str().unwrap())?;
+                    let result = unsafe { libc::mkfifo(c_path.as_ptr(), mode) };
+                    if result != 0 {
+                        return Err(anyhow::anyhow!("Failed to create FIFO: {}", std::io::Error::last_os_error()));
+                    }
+                }
+                FileType::Socket => {
+                    // Unix domain sockets are typically created by bind(), not mknod
+                    // For now, we'll create a placeholder file
+                    // A real implementation would need socket creation logic
+                    return Err(anyhow::anyhow!("Socket creation via MKNOD not fully supported"));
+                }
+                FileType::CharDevice | FileType::BlockDevice => {
+                    // Create device file using mknod
+                    use std::ffi::CString;
+                    let c_path = CString::new(file_path.to_str().unwrap())?;
+                    let dev = libc::makedev(rdev.0, rdev.1);
+                    let mode_with_type = mode | match file_type {
+                        FileType::CharDevice => libc::S_IFCHR,
+                        FileType::BlockDevice => libc::S_IFBLK,
+                        _ => 0,
+                    };
+                    let result = unsafe { libc::mknod(c_path.as_ptr(), mode_with_type, dev) };
+                    if result != 0 {
+                        return Err(anyhow::anyhow!("Failed to create device: {}", std::io::Error::last_os_error()));
+                    }
+                }
+                _ => {
+                    return Err(anyhow::anyhow!("Invalid file type for MKNOD: {:?}", file_type));
+                }
+            }
+        }
+
+        #[cfg(not(unix))]
+        {
+            return Err(anyhow::anyhow!("MKNOD is only supported on Unix systems"));
+        }
+
+        // Create handle for the new special file
+        let handle = self.handle_manager.create_handle(file_path.clone());
+        Ok(handle)
     }
 }
 

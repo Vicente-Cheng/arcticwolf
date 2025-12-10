@@ -40,11 +40,10 @@ pub fn handle_setattr(
     // Get file attributes before setattr (for wcc_data)
     let before_attrs = filesystem.getattr(&args.object.0).ok();
 
-    // Check guard if requested
-    if args.guard.check {
+    // Check guard if requested (guard is a union: CHECK with ctime or DONT_CHECK)
+    if let crate::protocol::v3::nfs::sattrguard3::CHECK(guard_ctime) = &args.guard {
         if let Some(ref before) = before_attrs {
             let before_ctime = before.ctime;
-            let guard_ctime = args.guard.obj_ctime;
 
             // Compare ctime - if different, file was modified
             if before_ctime.seconds != guard_ctime.seconds as u64

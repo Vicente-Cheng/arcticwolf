@@ -453,4 +453,60 @@ impl NfsMessage {
         let (args, _bytes_read) = REMOVE3args::unpack(&mut cursor)?;
         Ok(args)
     }
+
+    /// Deserialize MKDIR3args from XDR bytes
+    pub fn deserialize_mkdir3args(data: &[u8]) -> Result<MKDIR3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = MKDIR3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
+
+    /// Deserialize RMDIR3args from XDR bytes
+    pub fn deserialize_rmdir3args(data: &[u8]) -> Result<RMDIR3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = RMDIR3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
+
+    /// Deserialize RENAME3args from XDR bytes
+    pub fn deserialize_rename3args(data: &[u8]) -> Result<RENAME3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = RENAME3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
+
+    /// Deserialize READLINK3args from XDR bytes
+    pub fn deserialize_readlink3args(data: &[u8]) -> Result<READLINK3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = READLINK3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
+
+    /// Deserialize SYMLINK3args from XDR bytes
+    pub fn deserialize_symlink3args(data: &[u8]) -> Result<SYMLINK3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = SYMLINK3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
+
+    /// Deserialize LINK3args from XDR bytes
+    pub fn deserialize_link3args(data: &[u8]) -> Result<LINK3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = LINK3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
+
+    /// Deserialize COMMIT3args from XDR bytes
+    pub fn deserialize_commit3args(data: &[u8]) -> Result<COMMIT3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = COMMIT3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
+
+    /// Deserialize MKNOD3args from XDR bytes
+    pub fn deserialize_mknod3args(data: &[u8]) -> Result<MKNOD3args> {
+        let mut cursor = Cursor::new(data);
+        let (args, _bytes_read) = MKNOD3args::unpack(&mut cursor)?;
+        Ok(args)
+    }
 }

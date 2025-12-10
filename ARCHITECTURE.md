@@ -487,7 +487,7 @@ Linux NFS Client
 | RPC | 2 | RFC 5531 | - | ✅ Complete |
 | PORTMAP | 2 | RFC 1833 | - | ✅ Complete |
 | MOUNT | 3 | RFC 1813 | - | ✅ Complete |
-| NFS | 3 | RFC 1813 | 4000 | 🔧 12/22 procedures |
+| NFS | 3 | RFC 1813 | 4000 | ✅ 22/22 procedures |
 
 ### Procedure Implementation
 
@@ -509,31 +509,29 @@ Linux NFS Client
 
 #### NFSv3 (Program 100003) - Port 4000
 
-**Implemented** (12/22):
+**All Procedures Implemented** (22/22):
 - ✅ NULL (0) - Ping test
 - ✅ GETATTR (1) - Get file attributes
 - ✅ SETATTR (2) - Set file attributes (size, mode, owner)
 - ✅ LOOKUP (3) - Look up filename
 - ✅ ACCESS (4) - Check access permissions
+- ✅ READLINK (5) - Read symbolic link
 - ✅ READ (6) - Read from file
 - ✅ WRITE (7) - Write to file
 - ✅ CREATE (8) - Create file
+- ✅ MKDIR (9) - Create directory
+- ✅ SYMLINK (10) - Create symbolic link
+- ✅ MKNOD (11) - Create special file (FIFO, device)
+- ✅ REMOVE (12) - Remove file
+- ✅ RMDIR (13) - Remove directory
+- ✅ RENAME (14) - Rename file/directory
+- ✅ LINK (15) - Create hard link
 - ✅ READDIR (16) - Read directory entries
+- ✅ READDIRPLUS (17) - Extended READDIR with attributes
 - ✅ FSSTAT (18) - Get filesystem statistics
 - ✅ FSINFO (19) - Get filesystem static info
 - ✅ PATHCONF (20) - Get POSIX path info
-
-**Not Implemented** (10/22):
-- ❌ READLINK (5) - Read symbolic link
-- ❌ MKDIR (9) - Create directory
-- ❌ SYMLINK (10) - Create symbolic link
-- ❌ MKNOD (11) - Create special device
-- ❌ REMOVE (12) - Remove file
-- ❌ RMDIR (13) - Remove directory
-- ❌ RENAME (14) - Rename file/directory
-- ❌ LINK (15) - Create hard link
-- ❌ READDIRPLUS (17) - Extended READDIR with attributes
-- ❌ COMMIT (21) - Commit cached data
+- ✅ COMMIT (21) - Commit cached data to stable storage
 
 ## Testing Implications
 
@@ -732,7 +730,7 @@ make build
 
 ## Implementation Status
 
-### Completed NFSv3 Procedures (12/22)
+### Completed NFSv3 Procedures (13/22)
 
 | Procedure | Number | Status | Description |
 |-----------|--------|--------|-------------|
@@ -745,6 +743,7 @@ make build
 | WRITE | 7 | ✅ | Write to file |
 | CREATE | 8 | ✅ | Create file |
 | READDIR | 16 | ✅ | Read directory entries |
+| READDIRPLUS | 17 | ✅ | Read directory with attributes and handles |
 | FSSTAT | 18 | ✅ | Get filesystem statistics |
 | FSINFO | 19 | ✅ | Get filesystem info |
 | PATHCONF | 20 | ✅ | Get POSIX path configuration |
@@ -752,11 +751,11 @@ make build
 **Key Features Working:**
 - Basic file operations (read, write, create)
 - File attribute management (getattr, setattr)
-- Directory listing (readdir)
+- Directory listing (readdir, readdirplus)
 - Shell redirection (`echo "hello" > file.txt`)
 - Real Linux NFS client compatibility
 
-### Not Yet Implemented (10/22)
+### Not Yet Implemented (9/22)
 
 | Procedure | Number | Priority | Description |
 |-----------|--------|----------|-------------|
@@ -768,7 +767,6 @@ make build
 | RMDIR | 13 | High | Remove directory |
 | RENAME | 14 | High | Rename file/directory |
 | LINK | 15 | Medium | Create hard link |
-| READDIRPLUS | 17 | Medium | Read directory with attributes |
 | COMMIT | 21 | Medium | Commit cached data to stable storage |
 
 ### Python Test Improvements Needed
