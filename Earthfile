@@ -43,6 +43,17 @@ lint:
     RUN cargo fmt -- --check
     RUN cargo clippy -- -D warnings
 
+# earthly +image
+image:
+    ARG IMAGE_REPO=freezevicente
+    ARG IMAGE_TAG=latest
+    FROM +common
+    RUN cargo build --release
+    RUN mkdir -p /tmp/nfs_exports
+    EXPOSE 4000
+    ENTRYPOINT ["./target/release/arcticwolf"]
+    SAVE IMAGE ${IMAGE_REPO}/arcticwolf:${IMAGE_TAG}
+
 # earthly +server-docker
 # Build Docker image using the same build environment
 server-docker:
