@@ -2,7 +2,7 @@
 //
 // Implements Sun RPC over TCP with record marking protocol (RFC 5531)
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use bytes::{BufMut, BytesMut};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -71,10 +71,7 @@ async fn handle_connection(
         let is_last = (header_u32 & 0x80000000) != 0;
         let fragment_len = (header_u32 & 0x7FFFFFFF) as usize;
 
-        debug!(
-            "Record marking: last={}, length={}",
-            is_last, fragment_len
-        );
+        debug!("Record marking: last={}, length={}", is_last, fragment_len);
 
         // Read fragment data
         let mut fragment = vec![0u8; fragment_len];
@@ -177,7 +174,10 @@ async fn handle_rpc_message(
     let cred_padded = (cred_length + 3) & !3; // Round up to multiple of 4
     offset += 8 + cred_padded; // flavor(4) + length(4) + body(padded)
 
-    debug!("Credential length: {} bytes (padded: {}), offset now: {}", cred_length, cred_padded, offset);
+    debug!(
+        "Credential length: {} bytes (padded: {}), offset now: {}",
+        cred_length, cred_padded, offset
+    );
 
     // Parse verifier (opaque_auth)
     if data.len() < offset + 8 {
@@ -192,7 +192,10 @@ async fn handle_rpc_message(
     let verf_padded = (verf_length + 3) & !3; // Round up to multiple of 4
     offset += 8 + verf_padded; // flavor(4) + length(4) + body(padded)
 
-    debug!("Verifier length: {} bytes (padded: {}), offset now: {}", verf_length, verf_padded, offset);
+    debug!(
+        "Verifier length: {} bytes (padded: {}), offset now: {}",
+        verf_length, verf_padded, offset
+    );
 
     // Now offset points to the procedure arguments
     let args_offset = offset;

@@ -8,7 +8,7 @@ use bytes::BytesMut;
 use tracing::{debug, info};
 
 use crate::protocol::v3::mount::MountMessage;
-use crate::protocol::v3::rpc::{rpc_call_msg, RpcMessage};
+use crate::protocol::v3::rpc::{RpcMessage, rpc_call_msg};
 
 /// Handle MOUNT UMNT procedure
 ///

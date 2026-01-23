@@ -7,7 +7,7 @@ use anyhow::Result;
 use bytes::BytesMut;
 use tracing::debug;
 
-use crate::protocol::v3::rpc::{rpc_call_msg, RpcMessage};
+use crate::protocol::v3::rpc::{RpcMessage, rpc_call_msg};
 
 /// Handle Portmapper NULL procedure
 ///

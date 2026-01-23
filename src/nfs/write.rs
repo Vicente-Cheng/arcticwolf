@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use tracing::debug;
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS WRITE procedure (procedure 7)
@@ -40,10 +40,13 @@ pub async fn handle_write(
     );
 
     // Get file attributes before write (for wcc_data)
-    let before_attrs = filesystem.getattr(&args.file.0).await.ok();
+    let _before_attrs = filesystem.getattr(&args.file.0).await.ok();
 
     // Write data to the file
-    let bytes_written = match filesystem.write(&args.file.0, args.offset, &args.data).await {
+    let bytes_written = match filesystem
+        .write(&args.file.0, args.offset, &args.data)
+        .await
+    {
         Ok(count) => count,
         Err(e) => {
             debug!("WRITE failed: {}", e);
@@ -148,7 +151,7 @@ mod tests {
         let file_handle = fs.lookup(&root_handle, "writetest.txt").await.unwrap();
 
         // Serialize WRITE3args
-        use crate::protocol::v3::nfs::{fhandle3, stable_how, WRITE3args};
+        use crate::protocol::v3::nfs::{WRITE3args, fhandle3, stable_how};
         use xdr_codec::Pack;
 
         let test_data = b"Hello, NFS World!";
@@ -189,7 +192,7 @@ mod tests {
         let file_handle = fs.lookup(&root_handle, "offset.txt").await.unwrap();
 
         // Write at offset 5
-        use crate::protocol::v3::nfs::{fhandle3, stable_how, WRITE3args};
+        use crate::protocol::v3::nfs::{WRITE3args, fhandle3, stable_how};
         use xdr_codec::Pack;
 
         let test_data = b"ABCDE";
@@ -222,7 +225,7 @@ mod tests {
         let fs = config.create_filesystem().unwrap();
 
         // Use invalid file handle
-        use crate::protocol::v3::nfs::{fhandle3, stable_how, WRITE3args};
+        use crate::protocol::v3::nfs::{WRITE3args, fhandle3, stable_how};
         use xdr_codec::Pack;
 
         let test_data = b"test";
@@ -240,6 +243,9 @@ mod tests {
         // Call WRITE
         let result = handle_write(12345, &args_buf, fs.as_ref()).await;
 
-        assert!(result.is_ok(), "WRITE should return error response (not panic)");
+        assert!(
+            result.is_ok(),
+            "WRITE should return error response (not panic)"
+        );
     }
 }

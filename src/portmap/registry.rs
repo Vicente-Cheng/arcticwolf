@@ -90,6 +90,7 @@ impl Registry {
     }
 
     /// Get all registered mappings (PMAPPROC_DUMP)
+    #[allow(dead_code)]
     pub fn dump(&self) -> Vec<mapping> {
         let mappings = self.mappings.read().unwrap();
 

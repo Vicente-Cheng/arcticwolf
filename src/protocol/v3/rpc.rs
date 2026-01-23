@@ -8,7 +8,13 @@ use std::io::Cursor;
 use xdr_codec::{Pack, Unpack};
 
 // Include xdrgen-generated RPC types
-#[allow(dead_code, non_camel_case_types, non_snake_case, non_upper_case_globals, clippy::all)]
+#[allow(
+    dead_code,
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals,
+    clippy::all
+)]
 mod generated {
     include!(concat!(env!("OUT_DIR"), "/rpc_generated.rs"));
 }

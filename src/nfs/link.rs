@@ -12,7 +12,7 @@ use bytes::BytesMut;
 use tracing::{debug, warn};
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS LINK procedure (15)
@@ -26,7 +26,11 @@ use crate::protocol::v3::rpc::RpcMessage;
 ///
 /// # Returns
 /// Serialized LINK3res wrapped in RPC reply
-pub async fn handle_link(xid: u32, args_data: &[u8], filesystem: &dyn Filesystem) -> Result<BytesMut> {
+pub async fn handle_link(
+    xid: u32,
+    args_data: &[u8],
+    filesystem: &dyn Filesystem,
+) -> Result<BytesMut> {
     debug!("NFS LINK: xid={}", xid);
 
     // Parse arguments
@@ -46,7 +50,10 @@ pub async fn handle_link(xid: u32, args_data: &[u8], filesystem: &dyn Filesystem
     let dir_before = filesystem.getattr(&args.link_dir.0).await.ok();
 
     // Perform link operation
-    match filesystem.link(&args.file.0, &args.link_dir.0, &args.name.0).await {
+    match filesystem
+        .link(&args.file.0, &args.link_dir.0, &args.name.0)
+        .await
+    {
         Ok(_file_handle) => {
             debug!("LINK OK: created hard link '{}'", args.name.0);
 
@@ -152,7 +159,9 @@ fn map_error_to_status(error: &anyhow::Error) -> nfsstat3 {
         nfsstat3::NFS3ERR_ACCES // 13 - Permission denied
     } else if error_msg.contains("not a directory") {
         nfsstat3::NFS3ERR_NOTDIR // 20 - Not a directory
-    } else if error_msg.contains("is a directory") || error_msg.contains("cannot create hard link to directory") {
+    } else if error_msg.contains("is a directory")
+        || error_msg.contains("cannot create hard link to directory")
+    {
         nfsstat3::NFS3ERR_ISDIR // 21 - Is a directory
     } else if error_msg.contains("cross-device") || error_msg.contains("different filesystem") {
         nfsstat3::NFS3ERR_XDEV // 18 - Cross-device link

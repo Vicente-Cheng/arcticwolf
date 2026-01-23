@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use tracing::{debug, warn};
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS RMDIR request
@@ -22,7 +22,11 @@ use crate::protocol::v3::rpc::RpcMessage;
 ///
 /// # Returns
 /// Serialized RPC reply with RMDIR3res
-pub async fn handle_rmdir(xid: u32, args_data: &[u8], filesystem: &dyn Filesystem) -> Result<BytesMut> {
+pub async fn handle_rmdir(
+    xid: u32,
+    args_data: &[u8],
+    filesystem: &dyn Filesystem,
+) -> Result<BytesMut> {
     debug!("NFS RMDIR: xid={}", xid);
 
     // Parse arguments
@@ -35,7 +39,7 @@ pub async fn handle_rmdir(xid: u32, args_data: &[u8], filesystem: &dyn Filesyste
     );
 
     // Get parent directory attributes before removal (for wcc_data)
-    let dir_before = filesystem.getattr(&args.dir.0).await.ok();
+    let _dir_before = filesystem.getattr(&args.dir.0).await.ok();
 
     // Perform rmdir operation
     match filesystem.rmdir(&args.dir.0, &args.name.0).await {
@@ -63,9 +67,13 @@ pub async fn handle_rmdir(xid: u32, args_data: &[u8], filesystem: &dyn Filesyste
                 nfsstat3::NFS3ERR_NOENT
             } else if error_string.contains("permission") || error_string.contains("Permission") {
                 nfsstat3::NFS3ERR_ACCES
-            } else if error_string.contains("not empty") || error_string.contains("Directory not empty") {
+            } else if error_string.contains("not empty")
+                || error_string.contains("Directory not empty")
+            {
                 nfsstat3::NFS3ERR_NOTEMPTY
-            } else if error_string.contains("not a directory") || error_string.contains("Not a directory") {
+            } else if error_string.contains("not a directory")
+                || error_string.contains("Not a directory")
+            {
                 nfsstat3::NFS3ERR_NOTDIR
             } else {
                 // Try to get std::io::Error from anyhow::Error
@@ -81,7 +89,11 @@ pub async fn handle_rmdir(xid: u32, args_data: &[u8], filesystem: &dyn Filesyste
             };
 
             // Try to get current parent directory attributes for wcc_data
-            let dir_after = filesystem.getattr(&args.dir.0).await.ok().map(|attr| NfsMessage::fsal_to_fattr3(&attr));
+            let dir_after = filesystem
+                .getattr(&args.dir.0)
+                .await
+                .ok()
+                .map(|attr| NfsMessage::fsal_to_fattr3(&attr));
 
             create_rmdir_response(xid, status, dir_after)
         }

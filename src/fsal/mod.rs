@@ -18,6 +18,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::path::PathBuf;
 
+#[allow(unused_imports)]
 pub use handle::{FileHandle, HandleManager};
 pub use local::LocalFilesystem;
 
@@ -77,6 +78,7 @@ pub struct FileTime {
 /// Directory entry
 ///
 /// Represents a single entry in a directory listing.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct DirEntry {
     /// File ID (inode number)
@@ -140,7 +142,12 @@ pub trait Filesystem: Send + Sync {
     ///
     /// # Returns
     /// Tuple of (entries, eof) where eof indicates if all entries were returned
-    async fn readdir(&self, dir_handle: &FileHandle, cookie: u64, count: u32) -> Result<(Vec<DirEntry>, bool)>;
+    async fn readdir(
+        &self,
+        dir_handle: &FileHandle,
+        cookie: u64,
+        count: u32,
+    ) -> Result<(Vec<DirEntry>, bool)>;
 
     /// Write data to a file
     ///
@@ -173,7 +180,12 @@ pub trait Filesystem: Send + Sync {
     /// * `handle` - File handle
     /// * `uid` - New user ID (None to keep current)
     /// * `gid` - New group ID (None to keep current)
-    async fn setattr_owner(&self, handle: &FileHandle, uid: Option<u32>, gid: Option<u32>) -> Result<()>;
+    async fn setattr_owner(
+        &self,
+        handle: &FileHandle,
+        uid: Option<u32>,
+        gid: Option<u32>,
+    ) -> Result<()>;
 
     /// Create a file
     ///
@@ -232,7 +244,12 @@ pub trait Filesystem: Send + Sync {
     /// * `dir_handle` - Parent directory handle
     /// * `name` - Symlink name
     /// * `target` - Target path the symlink points to
-    async fn symlink(&self, dir_handle: &FileHandle, name: &str, target: &str) -> Result<FileHandle>;
+    async fn symlink(
+        &self,
+        dir_handle: &FileHandle,
+        name: &str,
+        target: &str,
+    ) -> Result<FileHandle>;
 
     /// Read a symbolic link
     ///
@@ -252,7 +269,12 @@ pub trait Filesystem: Send + Sync {
     ///
     /// # Returns
     /// The file handle (should be the same as source file handle since they share the same inode)
-    async fn link(&self, file_handle: &FileHandle, dir_handle: &FileHandle, name: &str) -> Result<FileHandle>;
+    async fn link(
+        &self,
+        file_handle: &FileHandle,
+        dir_handle: &FileHandle,
+        name: &str,
+    ) -> Result<FileHandle>;
 
     /// Commit cached data to stable storage
     ///
@@ -321,6 +343,7 @@ pub struct BackendConfig {
 }
 
 /// S3 backend configuration (placeholder for future)
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct S3Config {
     pub bucket: String,
@@ -330,6 +353,7 @@ pub struct S3Config {
 }
 
 /// Ceph backend configuration (placeholder for future)
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct CephConfig {
     pub monitors: Vec<String>,

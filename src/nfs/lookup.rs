@@ -109,11 +109,11 @@ pub async fn handle_lookup(
     nfs_handle.pack(&mut buf)?;
 
     // 3. post_op_attr (obj_attributes)
-    true.pack(&mut buf)?;  // attributes_follow = TRUE
+    true.pack(&mut buf)?; // attributes_follow = TRUE
     nfs_obj_attrs.pack(&mut buf)?;
 
     // 4. post_op_attr (dir_attributes)
-    true.pack(&mut buf)?;  // attributes_follow = TRUE
+    true.pack(&mut buf)?; // attributes_follow = TRUE
     nfs_dir_attrs.pack(&mut buf)?;
 
     let res_data = BytesMut::from(&buf[..]);
@@ -143,7 +143,7 @@ mod tests {
         let root_handle = fs.root_handle().await;
 
         // Serialize LOOKUP3args
-        use crate::protocol::v3::nfs::{LOOKUP3args, filename3, fhandle3};
+        use crate::protocol::v3::nfs::{LOOKUP3args, fhandle3, filename3};
         use xdr_codec::Pack;
 
         let args = LOOKUP3args {
@@ -174,7 +174,7 @@ mod tests {
         let root_handle = fs.root_handle().await;
 
         // Serialize LOOKUP3args for non-existent file
-        use crate::protocol::v3::nfs::{LOOKUP3args, filename3, fhandle3};
+        use crate::protocol::v3::nfs::{LOOKUP3args, fhandle3, filename3};
         use xdr_codec::Pack;
 
         let args = LOOKUP3args {
@@ -188,6 +188,9 @@ mod tests {
         // Call LOOKUP
         let result = handle_lookup(12345, &args_buf, fs.as_ref()).await;
 
-        assert!(result.is_ok(), "LOOKUP should return error response (not panic)");
+        assert!(
+            result.is_ok(),
+            "LOOKUP should return error response (not panic)"
+        );
     }
 }

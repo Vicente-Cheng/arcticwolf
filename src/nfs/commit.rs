@@ -12,7 +12,7 @@ use bytes::BytesMut;
 use tracing::{debug, warn};
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS COMMIT procedure (21)
@@ -26,7 +26,11 @@ use crate::protocol::v3::rpc::RpcMessage;
 ///
 /// # Returns
 /// Serialized COMMIT3res wrapped in RPC reply
-pub async fn handle_commit(xid: u32, args_data: &[u8], filesystem: &dyn Filesystem) -> Result<BytesMut> {
+pub async fn handle_commit(
+    xid: u32,
+    args_data: &[u8],
+    filesystem: &dyn Filesystem,
+) -> Result<BytesMut> {
     debug!("NFS COMMIT: xid={}", xid);
 
     // Parse arguments
@@ -43,7 +47,10 @@ pub async fn handle_commit(xid: u32, args_data: &[u8], filesystem: &dyn Filesyst
     let file_before = filesystem.getattr(&args.file.0).await.ok();
 
     // Perform commit operation
-    match filesystem.commit(&args.file.0, args.offset, args.count).await {
+    match filesystem
+        .commit(&args.file.0, args.offset, args.count)
+        .await
+    {
         Ok(()) => {
             debug!("COMMIT OK");
 
@@ -125,7 +132,9 @@ fn create_commit_response(
             // Write verifier is opaque[8] - 8 bytes, no length prefix needed
             buf.extend_from_slice(&verf);
         } else {
-            return Err(anyhow::anyhow!("Success status but no write verifier provided"));
+            return Err(anyhow::anyhow!(
+                "Success status but no write verifier provided"
+            ));
         }
     }
 

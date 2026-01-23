@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use tracing::debug;
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS SETATTR procedure (procedure 2)
@@ -32,27 +32,23 @@ pub async fn handle_setattr(
     // Deserialize arguments
     let args = NfsMessage::deserialize_setattr3args(args_data)?;
 
-    debug!(
-        "SETATTR: file_handle={} bytes",
-        args.object.0.len(),
-    );
+    debug!("SETATTR: file_handle={} bytes", args.object.0.len(),);
 
     // Get file attributes before setattr (for wcc_data)
     let before_attrs = filesystem.getattr(&args.object.0).await.ok();
 
     // Check guard if requested (guard is a union: CHECK with ctime or DONT_CHECK)
-    if let crate::protocol::v3::nfs::sattrguard3::CHECK(guard_ctime) = &args.guard {
-        if let Some(ref before) = before_attrs {
-            let before_ctime = before.ctime;
-
-            // Compare ctime - if different, file was modified
-            if before_ctime.seconds != guard_ctime.seconds as u64
-                || before_ctime.nseconds != guard_ctime.nseconds {
-                debug!("SETATTR: guard check failed - file was modified");
-                let error_status = nfsstat3::NFS3ERR_NOT_SYNC;
-                let res_data = NfsMessage::create_setattr_error_response(error_status)?;
-                return RpcMessage::create_success_reply_with_data(xid, res_data);
-            }
+    if let crate::protocol::v3::nfs::sattrguard3::CHECK(guard_ctime) = &args.guard
+        && let Some(ref before) = before_attrs
+    {
+        // Compare ctime - if different, file was modified
+        if before.ctime.seconds != guard_ctime.seconds as u64
+            || before.ctime.nseconds != guard_ctime.nseconds
+        {
+            debug!("SETATTR: guard check failed - file was modified");
+            let error_status = nfsstat3::NFS3ERR_NOT_SYNC;
+            let res_data = NfsMessage::create_setattr_error_response(error_status)?;
+            return RpcMessage::create_success_reply_with_data(xid, res_data);
         }
     }
 
@@ -190,8 +186,8 @@ mod tests {
 
         // Serialize SETATTR3args to truncate to 5 bytes
         use crate::protocol::v3::nfs::{
-            fhandle3, nfstime3, sattrguard3, sattr3, set_atime, set_gid3, set_mode3,
-            set_mtime, set_size3, set_uid3, SETATTR3args,
+            SETATTR3args, fhandle3, nfstime3, sattr3, sattrguard3, set_atime, set_gid3, set_mode3,
+            set_mtime, set_size3, set_uid3,
         };
         use xdr_codec::Pack;
 
@@ -248,8 +244,8 @@ mod tests {
 
         // Serialize SETATTR3args to set mode to 0644
         use crate::protocol::v3::nfs::{
-            fhandle3, nfstime3, sattrguard3, sattr3, set_atime, set_gid3, set_mode3,
-            set_mtime, set_size3, set_uid3, SETATTR3args,
+            SETATTR3args, fhandle3, nfstime3, sattr3, sattrguard3, set_atime, set_gid3, set_mode3,
+            set_mtime, set_size3, set_uid3,
         };
         use xdr_codec::Pack;
 

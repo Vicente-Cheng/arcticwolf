@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use tracing::debug;
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 // Access mode bits (from RFC 1813)
@@ -63,7 +63,7 @@ pub async fn handle_access(
             use xdr_codec::Pack;
             let mut buf = Vec::new();
             (error_status as i32).pack(&mut buf)?;
-            false.pack(&mut buf)?;  // attributes_follow = FALSE
+            false.pack(&mut buf)?; // attributes_follow = FALSE
             let res_data = BytesMut::from(&buf[..]);
             return RpcMessage::create_success_reply_with_data(xid, res_data);
         }
@@ -115,7 +115,7 @@ pub async fn handle_access(
 
     // 2. post_op_attr (obj_attributes)
     // post_op_attr = bool (1 = present) + fattr3 (if present)
-    true.pack(&mut buf)?;  // attributes_follow = TRUE
+    true.pack(&mut buf)?; // attributes_follow = TRUE
     nfs_attrs.pack(&mut buf)?;
 
     // 3. access (granted permissions)
@@ -219,6 +219,9 @@ mod tests {
         // Call ACCESS
         let result = handle_access(12345, &args_buf, fs.as_ref()).await;
 
-        assert!(result.is_ok(), "ACCESS should return error response (not panic)");
+        assert!(
+            result.is_ok(),
+            "ACCESS should return error response (not panic)"
+        );
     }
 }

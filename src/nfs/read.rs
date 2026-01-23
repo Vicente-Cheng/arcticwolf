@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use tracing::debug;
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS READ procedure (procedure 6)
@@ -77,10 +77,7 @@ pub async fn handle_read(
     let bytes_read = data.len() as u32;
     let eof = (args.offset + bytes_read as u64) >= file_attrs.size;
 
-    debug!(
-        "READ success: read {} bytes, eof={}",
-        bytes_read, eof
-    );
+    debug!("READ success: read {} bytes, eof={}", bytes_read, eof);
 
     // Convert FSAL attributes to NFS fattr3
     let nfs_attrs = NfsMessage::fsal_to_fattr3(&file_attrs);
@@ -93,7 +90,7 @@ pub async fn handle_read(
     (nfsstat3::NFS3_OK as i32).pack(&mut buf)?;
 
     // 2. post_op_attr (file_attributes)
-    true.pack(&mut buf)?;  // attributes_follow = TRUE
+    true.pack(&mut buf)?; // attributes_follow = TRUE
     nfs_attrs.pack(&mut buf)?;
 
     // 3. count (bytes read)
@@ -110,9 +107,7 @@ pub async fn handle_read(
 
     // Add padding to align to 4-byte boundary
     let padding = (4 - (data.len() % 4)) % 4;
-    for _ in 0..padding {
-        buf.push(0);
-    }
+    buf.resize(buf.len() + padding, 0);
 
     let res_data = BytesMut::from(&buf[..]);
 
@@ -221,6 +216,9 @@ mod tests {
         // Call READ
         let result = handle_read(12345, &args_buf, fs.as_ref()).await;
 
-        assert!(result.is_ok(), "READ should return error response (not panic)");
+        assert!(
+            result.is_ok(),
+            "READ should return error response (not panic)"
+        );
     }
 }

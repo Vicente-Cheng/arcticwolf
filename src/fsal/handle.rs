@@ -87,12 +87,14 @@ impl HandleManager {
     }
 
     /// Check if a file handle exists
+    #[allow(dead_code)]
     pub fn is_valid(&self, handle: &FileHandle) -> bool {
         let handle_map = self.handle_to_path.read().unwrap();
         handle_map.contains_key(handle)
     }
 
     /// Remove a file handle (e.g., when file is deleted)
+    #[allow(dead_code)]
     pub fn remove_handle(&self, handle: &FileHandle) -> Option<PathBuf> {
         let mut handle_map = self.handle_to_path.write().unwrap();
         let mut path_map = self.path_to_handle.write().unwrap();
@@ -107,6 +109,7 @@ impl HandleManager {
     }
 
     /// Get total number of handles
+    #[allow(dead_code)]
     pub fn count(&self) -> usize {
         let handle_map = self.handle_to_path.read().unwrap();
         handle_map.len()

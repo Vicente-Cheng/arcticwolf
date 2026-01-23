@@ -8,7 +8,13 @@ use std::io::Cursor;
 use xdr_codec::{Pack, Unpack};
 
 // Include xdrgen-generated Portmapper types
-#[allow(dead_code, non_camel_case_types, non_snake_case, non_upper_case_globals, clippy::all)]
+#[allow(
+    dead_code,
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals,
+    clippy::all
+)]
 mod generated {
     include!(concat!(env!("OUT_DIR"), "/portmap_generated.rs"));
 }
@@ -43,6 +49,7 @@ impl PortmapMessage {
     }
 
     /// Create a mapping entry
+    #[allow(dead_code)]
     pub fn create_mapping(prog: u32, vers: u32, prot: u32, port: u32) -> mapping {
         mapping {
             prog,

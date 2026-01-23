@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use tracing::debug;
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 // FSINFO property constants
@@ -35,13 +35,19 @@ pub async fn handle_fsinfo(
     debug!("NFS FSINFO called (xid={})", xid);
 
     // Deserialize arguments (fsroot handle)
-    debug!("FSINFO: args_data = {} bytes, hex: {:02x?}",
-           args_data.len(), &args_data[..args_data.len().min(100)]);
+    debug!(
+        "FSINFO: args_data = {} bytes, hex: {:02x?}",
+        args_data.len(),
+        &args_data[..args_data.len().min(100)]
+    );
 
     let args = NfsMessage::deserialize_fsinfo3args(args_data)?;
 
-    debug!("FSINFO: fsroot_handle={} bytes, hex: {:02x?}",
-           args.fsroot.0.len(), &args.fsroot.0);
+    debug!(
+        "FSINFO: fsroot_handle={} bytes, hex: {:02x?}",
+        args.fsroot.0.len(),
+        &args.fsroot.0
+    );
 
     // Get filesystem attributes
     let obj_attrs = match filesystem.getattr(&args.fsroot.0).await {
@@ -164,6 +170,9 @@ mod tests {
         // Call FSINFO
         let result = handle_fsinfo(12345, &args_buf, fs.as_ref()).await;
 
-        assert!(result.is_ok(), "FSINFO should return error response (not panic)");
+        assert!(
+            result.is_ok(),
+            "FSINFO should return error response (not panic)"
+        );
     }
 }
