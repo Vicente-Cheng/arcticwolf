@@ -9,7 +9,7 @@ use tracing::debug;
 
 use crate::portmap::registry::Registry;
 use crate::protocol::v3::portmap::PortmapMessage;
-use crate::protocol::v3::rpc::{rpc_call_msg, RpcMessage};
+use crate::protocol::v3::rpc::{RpcMessage, rpc_call_msg};
 
 /// Handle Portmapper GETPORT procedure
 ///

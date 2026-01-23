@@ -2,7 +2,7 @@
 //
 // Implements the Filesystem trait for local filesystem access.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
@@ -131,7 +131,7 @@ impl LocalFilesystem {
     }
 
     /// Convert std::fs::Metadata to FileAttributes
-    fn metadata_to_attr(&self, metadata: &fs::Metadata, path: &Path) -> FileAttributes {
+    fn metadata_to_attr(&self, metadata: &fs::Metadata, _path: &Path) -> FileAttributes {
         #[cfg(unix)]
         let ftype = {
             use std::os::unix::fs::FileTypeExt;
@@ -229,7 +229,9 @@ impl Filesystem for LocalFilesystem {
     async fn getattr(&self, handle: &FileHandle) -> Result<FileAttributes> {
         let path = self.resolve_handle(handle)?;
 
-        let metadata = tokio_fs::metadata(&path).await.context(format!("Failed to stat: {:?}", path))?;
+        let metadata = tokio_fs::metadata(&path)
+            .await
+            .context(format!("Failed to stat: {:?}", path))?;
 
         Ok(self.metadata_to_attr(&metadata, &path))
     }
@@ -237,8 +239,9 @@ impl Filesystem for LocalFilesystem {
     async fn read(&self, handle: &FileHandle, offset: u64, count: u32) -> Result<Vec<u8>> {
         let path = self.resolve_handle(handle)?;
 
-        let mut file =
-            tokio_fs::File::open(&path).await.context(format!("Failed to open file: {:?}", path))?;
+        let mut file = tokio_fs::File::open(&path)
+            .await
+            .context(format!("Failed to open file: {:?}", path))?;
 
         // Seek to offset
         file.seek(std::io::SeekFrom::Start(offset))
@@ -247,7 +250,10 @@ impl Filesystem for LocalFilesystem {
 
         // Read up to count bytes
         let mut buffer = vec![0u8; count as usize];
-        let bytes_read = file.read(&mut buffer).await.context("Failed to read file")?;
+        let bytes_read = file
+            .read(&mut buffer)
+            .await
+            .context("Failed to read file")?;
 
         // Truncate buffer to actual bytes read
         buffer.truncate(bytes_read);
@@ -260,7 +266,12 @@ impl Filesystem for LocalFilesystem {
         Ok(buffer)
     }
 
-    async fn readdir(&self, dir_handle: &FileHandle, cookie: u64, count: u32) -> Result<(Vec<DirEntry>, bool)> {
+    async fn readdir(
+        &self,
+        dir_handle: &FileHandle,
+        cookie: u64,
+        count: u32,
+    ) -> Result<(Vec<DirEntry>, bool)> {
         let dir_path = self.resolve_handle(dir_handle)?;
 
         // Verify it's a directory
@@ -281,9 +292,14 @@ impl Filesystem for LocalFilesystem {
         let mut entries: Vec<DirEntry> = Vec::new();
         let mut index: u64 = 0;
 
-        while let Some(entry) = read_dir.next_entry().await.context("Failed to read directory entry")? {
+        while let Some(entry) = read_dir
+            .next_entry()
+            .await
+            .context("Failed to read directory entry")?
+        {
             let entry_path = entry.path();
-            let entry_metadata = entry.metadata()
+            let entry_metadata = entry
+                .metadata()
                 .await
                 .context(format!("Failed to get metadata for: {:?}", entry_path))?;
 
@@ -322,9 +338,7 @@ impl Filesystem for LocalFilesystem {
                 FileType::RegularFile // Default
             };
 
-            let name = entry.file_name()
-                .to_string_lossy()
-                .to_string();
+            let name = entry.file_name().to_string_lossy().to_string();
 
             // Skip entries before cookie (cookie is 0-based index + 1)
             if cookie > 0 && index < cookie {
@@ -344,7 +358,10 @@ impl Filesystem for LocalFilesystem {
             if entries.len() >= count as usize {
                 debug!(
                     "READDIR: {:?} cookie={} count={} -> {} entries (more available)",
-                    dir_path, cookie, count, entries.len()
+                    dir_path,
+                    cookie,
+                    count,
+                    entries.len()
                 );
                 return Ok((entries, false)); // Not EOF, more entries available
             }
@@ -352,7 +369,10 @@ impl Filesystem for LocalFilesystem {
 
         debug!(
             "READDIR: {:?} cookie={} count={} -> {} entries (EOF)",
-            dir_path, cookie, count, entries.len()
+            dir_path,
+            cookie,
+            count,
+            entries.len()
         );
 
         Ok((entries, true)) // EOF reached
@@ -364,6 +384,7 @@ impl Filesystem for LocalFilesystem {
         let mut file = tokio_fs::OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(false)
             .open(&path)
             .await
             .context(format!("Failed to open file for writing: {:?}", path))?;
@@ -421,13 +442,21 @@ impl Filesystem for LocalFilesystem {
         Ok(())
     }
 
-    async fn setattr_owner(&self, handle: &FileHandle, uid: Option<u32>, gid: Option<u32>) -> Result<()> {
+    async fn setattr_owner(
+        &self,
+        handle: &FileHandle,
+        uid: Option<u32>,
+        gid: Option<u32>,
+    ) -> Result<()> {
         let path = self.resolve_handle(handle)?;
 
         // Note: chown requires root privileges on Unix systems
         // For now, we'll just log this and return success
         // In production, you might want to use nix::unistd::chown
-        debug!("SETATTR: {:?} uid={:?} gid={:?} (not implemented)", path, uid, gid);
+        debug!(
+            "SETATTR: {:?} uid={:?} gid={:?} (not implemented)",
+            path, uid, gid
+        );
 
         Ok(())
     }
@@ -478,7 +507,9 @@ impl Filesystem for LocalFilesystem {
         self.validate_path(&full_path)?;
 
         // Remove file
-        tokio_fs::remove_file(&full_path).await.context(format!("Failed to remove file: {:?}", full_path))?;
+        tokio_fs::remove_file(&full_path)
+            .await
+            .context(format!("Failed to remove file: {:?}", full_path))?;
 
         debug!("REMOVE: {:?}", full_path);
 
@@ -499,11 +530,15 @@ impl Filesystem for LocalFilesystem {
         self.validate_path(&full_path)?;
 
         // Create directory
-        tokio_fs::create_dir(&full_path).await.context(format!("Failed to create directory: {:?}", full_path))?;
+        tokio_fs::create_dir(&full_path)
+            .await
+            .context(format!("Failed to create directory: {:?}", full_path))?;
 
         // Set permissions
         let permissions = fs::Permissions::from_mode(mode);
-        tokio_fs::set_permissions(&full_path, permissions).await.context("Failed to set permissions")?;
+        tokio_fs::set_permissions(&full_path, permissions)
+            .await
+            .context("Failed to set permissions")?;
 
         // Create handle
         let handle = self.handle_manager.create_handle(full_path.clone());
@@ -564,14 +599,22 @@ impl Filesystem for LocalFilesystem {
         // Rename/move the file or directory
         tokio_fs::rename(&from_full_path, &to_full_path)
             .await
-            .context(format!("Failed to rename {:?} to {:?}", from_full_path, to_full_path))?;
+            .context(format!(
+                "Failed to rename {:?} to {:?}",
+                from_full_path, to_full_path
+            ))?;
 
         debug!("RENAME: {:?} -> {:?}", from_full_path, to_full_path);
 
         Ok(())
     }
 
-    async fn symlink(&self, dir_handle: &FileHandle, name: &str, target: &str) -> Result<FileHandle> {
+    async fn symlink(
+        &self,
+        dir_handle: &FileHandle,
+        name: &str,
+        target: &str,
+    ) -> Result<FileHandle> {
         let dir_path = self.resolve_handle(dir_handle)?;
 
         // Security: prevent path traversal in symlink name
@@ -586,14 +629,20 @@ impl Filesystem for LocalFilesystem {
 
         // Check if file/symlink already exists
         if symlink_path.exists() {
-            return Err(anyhow!("File or symlink already exists: {:?}", symlink_path));
+            return Err(anyhow!(
+                "File or symlink already exists: {:?}",
+                symlink_path
+            ));
         }
 
         // Create symbolic link
         #[cfg(unix)]
         tokio_fs::symlink(target, &symlink_path)
             .await
-            .context(format!("Failed to create symlink {:?} -> {}", symlink_path, target))?;
+            .context(format!(
+                "Failed to create symlink {:?} -> {}",
+                symlink_path, target
+            ))?;
 
         #[cfg(not(unix))]
         return Err(anyhow!("Symbolic links are only supported on Unix systems"));
@@ -629,7 +678,12 @@ impl Filesystem for LocalFilesystem {
         Ok(target_str)
     }
 
-    async fn link(&self, file_handle: &FileHandle, dir_handle: &FileHandle, name: &str) -> Result<FileHandle> {
+    async fn link(
+        &self,
+        file_handle: &FileHandle,
+        dir_handle: &FileHandle,
+        name: &str,
+    ) -> Result<FileHandle> {
         let file_path = self.resolve_handle(file_handle)?;
         let dir_path = self.resolve_handle(dir_handle)?;
 
@@ -655,13 +709,19 @@ impl Filesystem for LocalFilesystem {
 
         // Cannot create hard link to a directory (POSIX restriction)
         if metadata.is_dir() {
-            return Err(anyhow!("Cannot create hard link to directory: {:?}", file_path));
+            return Err(anyhow!(
+                "Cannot create hard link to directory: {:?}",
+                file_path
+            ));
         }
 
         // Create hard link
         tokio_fs::hard_link(&file_path, &link_path)
             .await
-            .context(format!("Failed to create hard link {:?} -> {:?}", link_path, file_path))?;
+            .context(format!(
+                "Failed to create hard link {:?} -> {:?}",
+                link_path, file_path
+            ))?;
 
         debug!("LINK: {:?} -> {:?}", link_path, file_path);
 
@@ -690,10 +750,7 @@ impl Filesystem for LocalFilesystem {
             .await
             .context(format!("Failed to sync file: {:?}", path))?;
 
-        debug!(
-            "COMMIT: {:?} (offset={}, count={})",
-            path, offset, count
-        );
+        debug!("COMMIT: {:?} (offset={}, count={})", path, offset, count);
 
         Ok(())
     }
@@ -725,33 +782,47 @@ impl Filesystem for LocalFilesystem {
                     let c_path = CString::new(file_path_clone.to_str().unwrap())?;
                     let result = unsafe { libc::mkfifo(c_path.as_ptr(), mode as libc::mode_t) };
                     if result != 0 {
-                        return Err(anyhow::anyhow!("Failed to create FIFO: {}", std::io::Error::last_os_error()));
+                        return Err(anyhow::anyhow!(
+                            "Failed to create FIFO: {}",
+                            std::io::Error::last_os_error()
+                        ));
                     }
                 }
                 FileType::Socket => {
                     // Unix domain sockets are typically created by bind(), not mknod
-                    return Err(anyhow::anyhow!("Socket creation via MKNOD not fully supported"));
+                    return Err(anyhow::anyhow!(
+                        "Socket creation via MKNOD not fully supported"
+                    ));
                 }
                 FileType::CharDevice | FileType::BlockDevice => {
                     use std::ffi::CString;
                     let c_path = CString::new(file_path_clone.to_str().unwrap())?;
                     let dev = libc::makedev(rdev.0, rdev.1);
-                    let mode_with_type = (mode as libc::mode_t) | match file_type_clone {
-                        FileType::CharDevice => libc::S_IFCHR as libc::mode_t,
-                        FileType::BlockDevice => libc::S_IFBLK as libc::mode_t,
-                        _ => 0,
-                    };
+                    let mode_with_type = (mode as libc::mode_t)
+                        | match file_type_clone {
+                            FileType::CharDevice => libc::S_IFCHR as libc::mode_t,
+                            FileType::BlockDevice => libc::S_IFBLK as libc::mode_t,
+                            _ => 0,
+                        };
                     let result = unsafe { libc::mknod(c_path.as_ptr(), mode_with_type, dev) };
                     if result != 0 {
-                        return Err(anyhow::anyhow!("Failed to create device: {}", std::io::Error::last_os_error()));
+                        return Err(anyhow::anyhow!(
+                            "Failed to create device: {}",
+                            std::io::Error::last_os_error()
+                        ));
                     }
                 }
                 _ => {
-                    return Err(anyhow::anyhow!("Invalid file type for MKNOD: {:?}", file_type_clone));
+                    return Err(anyhow::anyhow!(
+                        "Invalid file type for MKNOD: {:?}",
+                        file_type_clone
+                    ));
                 }
             }
             Ok(())
-        }).await.context("spawn_blocking failed")??;
+        })
+        .await
+        .context("spawn_blocking failed")??;
 
         // Create handle for the new special file
         let handle = self.handle_manager.create_handle(file_path.clone());
@@ -784,8 +855,15 @@ mod tests {
         let (fs, _temp_dir) = create_test_fs();
         let root = fs.root_handle().await;
 
-        let attr = fs.getattr(&root).await.expect("Failed to get root attributes");
-        assert_eq!(attr.ftype, FileType::Directory, "Root should be a directory");
+        let attr = fs
+            .getattr(&root)
+            .await
+            .expect("Failed to get root attributes");
+        assert_eq!(
+            attr.ftype,
+            FileType::Directory,
+            "Root should be a directory"
+        );
     }
 
     #[tokio::test]
@@ -794,18 +872,29 @@ mod tests {
         let root = fs.root_handle().await;
 
         // Create a file
-        let file_handle = fs.create(&root, "test.txt", 0o644).await
+        let file_handle = fs
+            .create(&root, "test.txt", 0o644)
+            .await
             .expect("Failed to create file");
 
         // Lookup the file
-        let lookup_handle = fs.lookup(&root, "test.txt").await
+        let lookup_handle = fs
+            .lookup(&root, "test.txt")
+            .await
             .expect("Failed to lookup file");
 
         assert_eq!(file_handle, lookup_handle, "Handles should match");
 
         // Get attributes
-        let attr = fs.getattr(&file_handle).await.expect("Failed to get attributes");
-        assert_eq!(attr.ftype, FileType::RegularFile, "Should be a regular file");
+        let attr = fs
+            .getattr(&file_handle)
+            .await
+            .expect("Failed to get attributes");
+        assert_eq!(
+            attr.ftype,
+            FileType::RegularFile,
+            "Should be a regular file"
+        );
         assert_eq!(attr.size, 0, "New file should be empty");
     }
 
@@ -815,22 +904,30 @@ mod tests {
         let root = fs.root_handle().await;
 
         // Create file
-        let file_handle = fs.create(&root, "data.txt", 0o644).await
+        let file_handle = fs
+            .create(&root, "data.txt", 0o644)
+            .await
             .expect("Failed to create file");
 
         // Write data
         let data = b"Hello, NFS World!";
-        let written = fs.write(&file_handle, 0, data).await
+        let written = fs
+            .write(&file_handle, 0, data)
+            .await
             .expect("Failed to write");
         assert_eq!(written, data.len() as u32, "Should write all bytes");
 
         // Read data back
-        let read_data = fs.read(&file_handle, 0, data.len() as u32).await
+        let read_data = fs
+            .read(&file_handle, 0, data.len() as u32)
+            .await
             .expect("Failed to read");
         assert_eq!(read_data, data, "Read data should match written data");
 
         // Read partial data
-        let partial = fs.read(&file_handle, 7, 3).await
+        let partial = fs
+            .read(&file_handle, 7, 3)
+            .await
             .expect("Failed to read partial");
         assert_eq!(partial, b"NFS", "Partial read should work");
     }
@@ -841,17 +938,24 @@ mod tests {
         let root = fs.root_handle().await;
 
         // Create directory
-        let dir_handle = fs.mkdir(&root, "subdir", 0o755).await
+        let dir_handle = fs
+            .mkdir(&root, "subdir", 0o755)
+            .await
             .expect("Failed to create directory");
 
         // Lookup directory
-        let lookup_handle = fs.lookup(&root, "subdir").await
+        let lookup_handle = fs
+            .lookup(&root, "subdir")
+            .await
             .expect("Failed to lookup directory");
 
         assert_eq!(dir_handle, lookup_handle, "Handles should match");
 
         // Get attributes
-        let attr = fs.getattr(&dir_handle).await.expect("Failed to get attributes");
+        let attr = fs
+            .getattr(&dir_handle)
+            .await
+            .expect("Failed to get attributes");
         assert_eq!(attr.ftype, FileType::Directory, "Should be a directory");
     }
 
@@ -861,22 +965,28 @@ mod tests {
         let root = fs.root_handle().await;
 
         // Create nested directory structure
-        let dir1 = fs.mkdir(&root, "dir1", 0o755).await
+        let dir1 = fs
+            .mkdir(&root, "dir1", 0o755)
+            .await
             .expect("Failed to create dir1");
 
-        let dir2 = fs.mkdir(&dir1, "dir2", 0o755).await
+        let dir2 = fs
+            .mkdir(&dir1, "dir2", 0o755)
+            .await
             .expect("Failed to create dir2");
 
         // Create file in nested directory
-        let file = fs.create(&dir2, "nested.txt", 0o644).await
+        let file = fs
+            .create(&dir2, "nested.txt", 0o644)
+            .await
             .expect("Failed to create nested file");
 
         // Write and read
-        fs.write(&file, 0, b"nested content").await
+        fs.write(&file, 0, b"nested content")
+            .await
             .expect("Failed to write");
 
-        let content = fs.read(&file, 0, 100).await
-            .expect("Failed to read");
+        let content = fs.read(&file, 0, 100).await.expect("Failed to read");
         assert_eq!(content, b"nested content");
     }
 
@@ -886,10 +996,12 @@ mod tests {
         let root = fs.root_handle().await;
 
         // Create and remove file
-        fs.create(&root, "temp.txt", 0o644).await
+        fs.create(&root, "temp.txt", 0o644)
+            .await
             .expect("Failed to create file");
 
-        fs.remove(&root, "temp.txt").await
+        fs.remove(&root, "temp.txt")
+            .await
             .expect("Failed to remove file");
 
         // Lookup should fail
@@ -903,10 +1015,12 @@ mod tests {
         let root = fs.root_handle().await;
 
         // Create and remove directory
-        fs.mkdir(&root, "tempdir", 0o755).await
+        fs.mkdir(&root, "tempdir", 0o755)
+            .await
             .expect("Failed to create directory");
 
-        fs.rmdir(&root, "tempdir").await
+        fs.rmdir(&root, "tempdir")
+            .await
             .expect("Failed to remove directory");
 
         // Lookup should fail
@@ -945,13 +1059,23 @@ mod tests {
         let root = fs.root_handle().await;
 
         // Create file
-        fs.create(&root, "file.txt", 0o644).await
+        fs.create(&root, "file.txt", 0o644)
+            .await
             .expect("Failed to create file");
 
         // Lookup multiple times should return same handle
-        let handle1 = fs.lookup(&root, "file.txt").await.expect("Failed to lookup");
-        let handle2 = fs.lookup(&root, "file.txt").await.expect("Failed to lookup");
+        let handle1 = fs
+            .lookup(&root, "file.txt")
+            .await
+            .expect("Failed to lookup");
+        let handle2 = fs
+            .lookup(&root, "file.txt")
+            .await
+            .expect("Failed to lookup");
 
-        assert_eq!(handle1, handle2, "Multiple lookups should return same handle");
+        assert_eq!(
+            handle1, handle2,
+            "Multiple lookups should return same handle"
+        );
     }
 }

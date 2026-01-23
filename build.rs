@@ -11,9 +11,7 @@ fn main() {
     let xdr_v3 = PathBuf::from("xdr/v3");
 
     // Check if xdrgen is available
-    let xdrgen_check = Command::new("xdrgen")
-        .arg("--version")
-        .output();
+    let xdrgen_check = Command::new("xdrgen").arg("--version").output();
 
     if xdrgen_check.is_err() {
         eprintln!("WARNING: xdrgen not found in PATH");
@@ -56,67 +54,67 @@ fn main() {
         if spec_file == "nfs.x" {
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum ACCESS3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum ACCESS3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum ACCESS3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum FSINFO3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum FSINFO3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum FSINFO3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum FSSTAT3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum FSSTAT3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum FSSTAT3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum PATHCONF3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum PATHCONF3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum PATHCONF3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum WRITE3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum WRITE3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum WRITE3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum SETATTR3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum SETATTR3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum SETATTR3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum CREATE3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum CREATE3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum CREATE3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum REMOVE3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum REMOVE3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum REMOVE3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum MKDIR3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum MKDIR3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum MKDIR3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum RMDIR3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum RMDIR3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum RMDIR3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum RENAME3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum RENAME3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum RENAME3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum READLINK3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum READLINK3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum READLINK3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum SYMLINK3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum SYMLINK3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum SYMLINK3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum LINK3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum LINK3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum LINK3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum COMMIT3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum COMMIT3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum COMMIT3res",
             );
             generated_code = generated_code.replace(
                 "#[derive( Copy , Clone , Debug , Eq , PartialEq )] pub enum MKNOD3res",
-                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum MKNOD3res"
+                "#[derive( Clone , Debug , Eq , PartialEq )] pub enum MKNOD3res",
             );
         }
 

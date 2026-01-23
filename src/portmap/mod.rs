@@ -12,7 +12,7 @@ pub mod registry;
 pub mod set;
 pub mod unset;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use bytes::BytesMut;
 use tracing::{debug, warn};
 
@@ -61,10 +61,7 @@ pub fn handle_portmap_call(
 
     // Verify version 2
     if call.vers != PORTMAP_V2 {
-        warn!(
-            "Expected PORTMAP version {}, got {}",
-            PORTMAP_V2, call.vers
-        );
+        warn!("Expected PORTMAP version {}, got {}", PORTMAP_V2, call.vers);
         return Err(anyhow!(
             "Unsupported PORTMAP version: expected {}, got {}",
             PORTMAP_V2,

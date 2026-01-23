@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use tracing::{debug, warn};
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS RENAME request
@@ -21,7 +21,11 @@ use crate::protocol::v3::rpc::RpcMessage;
 ///
 /// # Returns
 /// Serialized RPC reply with RENAME3res
-pub async fn handle_rename(xid: u32, args_data: &[u8], filesystem: &dyn Filesystem) -> Result<BytesMut> {
+pub async fn handle_rename(
+    xid: u32,
+    args_data: &[u8],
+    filesystem: &dyn Filesystem,
+) -> Result<BytesMut> {
     debug!("NFS RENAME: xid={}", xid);
 
     // Parse arguments
@@ -39,28 +43,28 @@ pub async fn handle_rename(xid: u32, args_data: &[u8], filesystem: &dyn Filesyst
     );
 
     // Get source directory attributes before operation (for wcc_data)
-    let fromdir_before = filesystem.getattr(&args.from_dir.0).await.ok();
+    let _fromdir_before = filesystem.getattr(&args.from_dir.0).await.ok();
 
     // Get target directory attributes before operation (for wcc_data)
     // Only if different from source directory
-    let todir_before = if args.from_dir.0 == args.to_dir.0 {
-        None  // Same directory, use fromdir_before
+    let _todir_before = if args.from_dir.0 == args.to_dir.0 {
+        None // Same directory, use fromdir_before
     } else {
         filesystem.getattr(&args.to_dir.0).await.ok()
     };
 
     // Perform rename operation
-    match filesystem.rename(
-        &args.from_dir.0,
-        &args.from_name.0,
-        &args.to_dir.0,
-        &args.to_name.0,
-    ).await {
+    match filesystem
+        .rename(
+            &args.from_dir.0,
+            &args.from_name.0,
+            &args.to_dir.0,
+            &args.to_name.0,
+        )
+        .await
+    {
         Ok(()) => {
-            debug!(
-                "RENAME OK: '{}' -> '{}'",
-                args.from_name.0, args.to_name.0
-            );
+            debug!("RENAME OK: '{}' -> '{}'", args.from_name.0, args.to_name.0);
 
             // Get source directory attributes after operation
             let fromdir_after = match filesystem.getattr(&args.from_dir.0).await {
@@ -73,7 +77,7 @@ pub async fn handle_rename(xid: u32, args_data: &[u8], filesystem: &dyn Filesyst
 
             // Get target directory attributes after operation
             let todir_after = if args.from_dir.0 == args.to_dir.0 {
-                fromdir_after.clone()  // Same directory
+                fromdir_after // Same directory (Copy type)
             } else {
                 match filesystem.getattr(&args.to_dir.0).await {
                     Ok(attr) => Some(NfsMessage::fsal_to_fattr3(&attr)),
@@ -93,17 +97,27 @@ pub async fn handle_rename(xid: u32, args_data: &[u8], filesystem: &dyn Filesyst
             let error_string = e.to_string();
             let status = if error_string.contains("not found") || error_string.contains("No such") {
                 nfsstat3::NFS3ERR_NOENT
-            } else if error_string.contains("already exists") || error_string.contains("File exists") {
+            } else if error_string.contains("already exists")
+                || error_string.contains("File exists")
+            {
                 nfsstat3::NFS3ERR_EXIST
             } else if error_string.contains("permission") || error_string.contains("Permission") {
                 nfsstat3::NFS3ERR_ACCES
-            } else if error_string.contains("not a directory") || error_string.contains("Not a directory") {
+            } else if error_string.contains("not a directory")
+                || error_string.contains("Not a directory")
+            {
                 nfsstat3::NFS3ERR_NOTDIR
-            } else if error_string.contains("is a directory") || error_string.contains("Is a directory") {
+            } else if error_string.contains("is a directory")
+                || error_string.contains("Is a directory")
+            {
                 nfsstat3::NFS3ERR_ISDIR
-            } else if error_string.contains("not empty") || error_string.contains("Directory not empty") {
+            } else if error_string.contains("not empty")
+                || error_string.contains("Directory not empty")
+            {
                 nfsstat3::NFS3ERR_NOTEMPTY
-            } else if error_string.contains("cross-device") || error_string.contains("Invalid cross-device") {
+            } else if error_string.contains("cross-device")
+                || error_string.contains("Invalid cross-device")
+            {
                 nfsstat3::NFS3ERR_XDEV
             } else {
                 // Try to get std::io::Error from anyhow::Error
@@ -120,11 +134,19 @@ pub async fn handle_rename(xid: u32, args_data: &[u8], filesystem: &dyn Filesyst
             };
 
             // Try to get current directory attributes for wcc_data
-            let fromdir_after = filesystem.getattr(&args.from_dir.0).await.ok().map(|attr| NfsMessage::fsal_to_fattr3(&attr));
+            let fromdir_after = filesystem
+                .getattr(&args.from_dir.0)
+                .await
+                .ok()
+                .map(|attr| NfsMessage::fsal_to_fattr3(&attr));
             let todir_after = if args.from_dir.0 == args.to_dir.0 {
-                fromdir_after.clone()
+                fromdir_after // Copy type
             } else {
-                filesystem.getattr(&args.to_dir.0).await.ok().map(|attr| NfsMessage::fsal_to_fattr3(&attr))
+                filesystem
+                    .getattr(&args.to_dir.0)
+                    .await
+                    .ok()
+                    .map(|attr| NfsMessage::fsal_to_fattr3(&attr))
             };
 
             create_rename_response(xid, status, fromdir_after, todir_after)
@@ -240,8 +262,14 @@ mod tests {
         assert!(result.is_ok(), "RENAME should succeed");
 
         // Verify file was renamed
-        assert!(!test_dir.join("oldname.txt").exists(), "Old file should not exist");
-        assert!(test_dir.join("newname.txt").exists(), "New file should exist");
+        assert!(
+            !test_dir.join("oldname.txt").exists(),
+            "Old file should not exist"
+        );
+        assert!(
+            test_dir.join("newname.txt").exists(),
+            "New file should exist"
+        );
 
         // Cleanup
         fs::remove_dir_all(&test_dir).unwrap();
@@ -283,8 +311,14 @@ mod tests {
         assert!(result.is_ok(), "RENAME should succeed");
 
         // Verify directory was renamed
-        assert!(!test_dir.join("olddir").exists(), "Old directory should not exist");
-        assert!(test_dir.join("newdir").exists(), "New directory should exist");
+        assert!(
+            !test_dir.join("olddir").exists(),
+            "Old directory should not exist"
+        );
+        assert!(
+            test_dir.join("newdir").exists(),
+            "New directory should exist"
+        );
 
         // Cleanup
         fs::remove_dir_all(&test_dir).unwrap();

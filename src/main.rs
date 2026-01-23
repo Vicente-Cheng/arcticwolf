@@ -1,6 +1,5 @@
 use anyhow::Result;
 use std::sync::Arc;
-use tracing_subscriber;
 
 mod fsal;
 mod mount;
@@ -22,8 +21,8 @@ fn register_services(registry: &portmap::Registry, port: u32) {
 
     // Register Portmapper itself (program 100000)
     let portmap_tcp = mapping {
-        prog: 100000,  // PORTMAP
-        vers: 2,       // Version 2
+        prog: 100000, // PORTMAP
+        vers: 2,      // Version 2
         prot: IPPROTO_TCP,
         port,
     };
@@ -32,8 +31,8 @@ fn register_services(registry: &portmap::Registry, port: u32) {
 
     // Register MOUNT protocol (program 100005)
     let mount_tcp = mapping {
-        prog: 100005,  // MOUNT
-        vers: 3,       // MOUNTv3
+        prog: 100005, // MOUNT
+        vers: 3,      // MOUNTv3
         prot: IPPROTO_TCP,
         port,
     };
@@ -42,8 +41,8 @@ fn register_services(registry: &portmap::Registry, port: u32) {
 
     // Register NFS protocol (program 100003)
     let nfs_tcp = mapping {
-        prog: 100003,  // NFS
-        vers: 3,       // NFSv3
+        prog: 100003, // NFS
+        vers: 3,      // NFSv3
         prot: IPPROTO_TCP,
         port,
     };
@@ -52,7 +51,6 @@ fn register_services(registry: &portmap::Registry, port: u32) {
 
     println!();
 }
-
 
 #[tokio::main]
 async fn main() -> Result<()> {

@@ -6,4 +6,5 @@
 pub mod v3;
 
 // Re-export commonly used types
-pub use v3::{RpcMessage, PortmapMessage, MountMessage, NfsMessage};
+#[allow(unused_imports)]
+pub use v3::{MountMessage, NfsMessage, PortmapMessage, RpcMessage};

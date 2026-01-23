@@ -5,13 +5,13 @@
 // - Conversion between XDR types and domain types
 // - Error handling
 
-pub mod rpc;
-pub mod portmap;
 pub mod mount;
 pub mod nfs;
+pub mod portmap;
+pub mod rpc;
 
 // Re-export for convenience
-pub use rpc::RpcMessage;
-pub use portmap::PortmapMessage;
 pub use mount::MountMessage;
 pub use nfs::NfsMessage;
+pub use portmap::PortmapMessage;
+pub use rpc::RpcMessage;

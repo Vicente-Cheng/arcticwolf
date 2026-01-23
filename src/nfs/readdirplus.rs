@@ -8,7 +8,7 @@ use bytes::BytesMut;
 use tracing::{debug, warn};
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{cookieverf3, nfsstat3, NfsMessage, COOKIEVERFSIZE};
+use crate::protocol::v3::nfs::{COOKIEVERFSIZE, NfsMessage, cookieverf3, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS READDIRPLUS request
@@ -57,7 +57,10 @@ pub async fn handle_readdirplus(
 
     // Read directory entries
     // Use dircount as the count parameter (RFC 1813 says dircount is for entry names)
-    let (entries, eof) = match filesystem.readdir(&args.dir.0, args.cookie, args.dircount).await {
+    let (entries, eof) = match filesystem
+        .readdir(&args.dir.0, args.cookie, args.dircount)
+        .await
+    {
         Ok(result) => result,
         Err(e) => {
             warn!("READDIRPLUS failed: {}", e);
@@ -124,7 +127,10 @@ pub async fn handle_readdirplus(
                     }
                     Err(e) => {
                         // Failed to get attributes - return empty post_op_attr and post_op_fh3
-                        warn!("READDIRPLUS: failed to get attributes for {}: {}", dir_entry.name, e);
+                        warn!(
+                            "READDIRPLUS: failed to get attributes for {}: {}",
+                            dir_entry.name, e
+                        );
                         false.pack(&mut buf)?; // post_op_attr: no attributes
                         false.pack(&mut buf)?; // post_op_fh3: no handle
                     }

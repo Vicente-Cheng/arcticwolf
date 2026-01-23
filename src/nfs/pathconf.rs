@@ -8,7 +8,7 @@ use tracing::debug;
 use xdr_codec::Pack;
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{fattr3, nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, fattr3, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS PATHCONF request
@@ -20,7 +20,11 @@ use crate::protocol::v3::rpc::RpcMessage;
 ///
 /// # Returns
 /// Serialized RPC reply with PATHCONF3res
-pub async fn handle_pathconf(xid: u32, args_data: &[u8], filesystem: &dyn Filesystem) -> Result<BytesMut> {
+pub async fn handle_pathconf(
+    xid: u32,
+    args_data: &[u8],
+    filesystem: &dyn Filesystem,
+) -> Result<BytesMut> {
     debug!("NFS PATHCONF: xid={}", xid);
 
     // Parse arguments - just a file handle
@@ -42,13 +46,12 @@ pub async fn handle_pathconf(xid: u32, args_data: &[u8], filesystem: &dyn Filesy
 
     // Create PATHCONF response with typical Unix values
     let response = create_pathconf_ok(
-        obj_attrs,
-        255,    // linkmax - maximum number of hard links
-        255,    // name_max - maximum filename length
-        true,   // no_trunc - server will reject names longer than name_max
-        true,   // chown_restricted - only privileged user can change file ownership
-        false,  // case_insensitive - filenames are case-sensitive
-        true,   // case_preserving - filenames preserve case
+        obj_attrs, 255,   // linkmax - maximum number of hard links
+        255,   // name_max - maximum filename length
+        true,  // no_trunc - server will reject names longer than name_max
+        true,  // chown_restricted - only privileged user can change file ownership
+        false, // case_insensitive - filenames are case-sensitive
+        true,  // case_preserving - filenames preserve case
     )?;
 
     debug!("PATHCONF OK: response size: {} bytes", response.len());
@@ -74,7 +77,7 @@ fn create_pathconf_ok(
 
     // 2. post_op_attr (obj_attributes)
     // post_op_attr = bool (1 = present) + fattr3 (if present)
-    true.pack(&mut buf)?;  // attributes_follow = TRUE
+    true.pack(&mut buf)?; // attributes_follow = TRUE
     obj_attributes.pack(&mut buf)?;
 
     // 3. PATHCONF fields
@@ -96,7 +99,7 @@ fn create_pathconf_error(xid: u32, status: nfsstat3) -> Result<BytesMut> {
     (status as i32).pack(&mut buf)?;
 
     // post_op_attr with no attributes (bool = false)
-    false.pack(&mut buf)?;  // attributes_follow = FALSE
+    false.pack(&mut buf)?; // attributes_follow = FALSE
 
     let res_data = BytesMut::from(&buf[..]);
     RpcMessage::create_success_reply_with_data(xid, res_data)

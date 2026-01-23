@@ -10,7 +10,16 @@ use xdr_codec::{Pack, Unpack};
 use crate::fsal;
 
 // Include xdrgen-generated NFS types
-#[allow(dead_code, non_camel_case_types, non_snake_case, non_upper_case_globals, clippy::all)]
+#[allow(
+    dead_code,
+    deprecated,
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals,
+    invalid_value,
+    unused_assignments,
+    clippy::all
+)]
 mod generated {
     include!(concat!(env!("OUT_DIR"), "/nfs_generated.rs"));
 }
@@ -21,6 +30,7 @@ pub use generated::*;
 /// Wrapper for NFS messages providing serialization helpers
 pub struct NfsMessage;
 
+#[allow(dead_code)]
 impl NfsMessage {
     /// Deserialize GETATTR request
     pub fn deserialize_getattr3args(data: &[u8]) -> Result<GETATTR3args> {
@@ -71,7 +81,7 @@ impl NfsMessage {
         // Since we don't have dir_attributes in error path, we use FALSE for post_op_attr
         let mut buf = Vec::new();
         (status as i32).pack(&mut buf)?;
-        false.pack(&mut buf)?;  // dir_attributes: post_op_attr = FALSE (no attributes)
+        false.pack(&mut buf)?; // dir_attributes: post_op_attr = FALSE (no attributes)
         Ok(BytesMut::from(&buf[..]))
     }
 
@@ -109,7 +119,7 @@ impl NfsMessage {
         // For READ error, we need status + post_op_attr (file_attributes)
         let mut buf = Vec::new();
         (status as i32).pack(&mut buf)?;
-        false.pack(&mut buf)?;  // file_attributes: post_op_attr = FALSE (no attributes)
+        false.pack(&mut buf)?; // file_attributes: post_op_attr = FALSE (no attributes)
         Ok(BytesMut::from(&buf[..]))
     }
 
@@ -147,8 +157,8 @@ impl NfsMessage {
         // wcc_data = pre_op_attr + post_op_attr
         let mut buf = Vec::new();
         (status as i32).pack(&mut buf)?;
-        false.pack(&mut buf)?;  // pre_op_attr = FALSE (no before attributes)
-        false.pack(&mut buf)?;  // post_op_attr = FALSE (no after attributes)
+        false.pack(&mut buf)?; // pre_op_attr = FALSE (no before attributes)
+        false.pack(&mut buf)?; // post_op_attr = FALSE (no after attributes)
         Ok(BytesMut::from(&buf[..]))
     }
 
@@ -167,8 +177,8 @@ impl NfsMessage {
         // wcc_data = pre_op_attr + post_op_attr
         let mut buf = Vec::new();
         (status as i32).pack(&mut buf)?;
-        false.pack(&mut buf)?;  // pre_op_attr = FALSE
-        false.pack(&mut buf)?;  // post_op_attr = FALSE
+        false.pack(&mut buf)?; // pre_op_attr = FALSE
+        false.pack(&mut buf)?; // post_op_attr = FALSE
         Ok(BytesMut::from(&buf[..]))
     }
 
@@ -187,8 +197,8 @@ impl NfsMessage {
         // dir_wcc = pre_op_attr + post_op_attr
         let mut buf = Vec::new();
         (status as i32).pack(&mut buf)?;
-        false.pack(&mut buf)?;  // pre_op_attr = FALSE
-        false.pack(&mut buf)?;  // post_op_attr = FALSE
+        false.pack(&mut buf)?; // pre_op_attr = FALSE
+        false.pack(&mut buf)?; // post_op_attr = FALSE
         Ok(BytesMut::from(&buf[..]))
     }
 
@@ -267,7 +277,7 @@ impl NfsMessage {
     pub fn create_fsstat_error_response(status: nfsstat3) -> Result<BytesMut> {
         let mut buf = Vec::new();
         (status as i32).pack(&mut buf)?;
-        false.pack(&mut buf)?;  // obj_attributes: post_op_attr = FALSE (no attributes)
+        false.pack(&mut buf)?; // obj_attributes: post_op_attr = FALSE (no attributes)
         Ok(BytesMut::from(&buf[..]))
     }
 

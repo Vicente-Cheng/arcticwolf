@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use tracing::debug;
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS CREATE procedure (procedure 8)
@@ -59,7 +59,7 @@ pub async fn handle_create(
             };
 
             // Create the file
-            match filesystem.create(&args.where_dir.0, &filename, mode).await {
+            match filesystem.create(&args.where_dir.0, filename, mode).await {
                 Ok(handle) => handle,
                 Err(e) => {
                     debug!("CREATE failed: {}", e);
@@ -87,7 +87,7 @@ pub async fn handle_create(
             // EXCLUSIVE mode: create file with verifier stored in mtime/atime
             // This is for safe concurrent creation
             // For simplicity, we'll treat it like GUARDED for now
-            match filesystem.create(&args.where_dir.0, &filename, 0o644).await {
+            match filesystem.create(&args.where_dir.0, filename, 0o644).await {
                 Ok(handle) => handle,
                 Err(e) => {
                     debug!("CREATE (EXCLUSIVE) failed: {}", e);
@@ -125,7 +125,10 @@ pub async fn handle_create(
         }
     };
 
-    debug!("CREATE success: new file handle {} bytes", file_handle.len());
+    debug!(
+        "CREATE success: new file handle {} bytes",
+        file_handle.len()
+    );
 
     // Convert FSAL attributes to NFS fattr3
     let nfs_file_attrs = NfsMessage::fsal_to_fattr3(&file_attrs);
@@ -148,7 +151,7 @@ pub async fn handle_create(
     buf.extend_from_slice(&file_handle);
     // Add padding
     let padding = (4 - (file_handle.len() % 4)) % 4;
-    buf.extend_from_slice(&vec![0u8; padding]);
+    buf.resize(buf.len() + padding, 0);
 
     // obj_attributes: post_op_attr (optional attributes)
     true.pack(&mut buf)?; // attributes_follow = TRUE
@@ -186,8 +189,8 @@ mod tests {
 
         // Serialize CREATE3args
         use crate::protocol::v3::nfs::{
-            createhow3, fhandle3, filename3, nfstime3, sattr3, set_atime, set_gid3,
-            set_mode3, set_mtime, set_size3, set_uid3, CREATE3args,
+            CREATE3args, createhow3, fhandle3, filename3, nfstime3, sattr3, set_atime, set_gid3,
+            set_mode3, set_mtime, set_size3, set_uid3,
         };
         use xdr_codec::Pack;
 
@@ -239,8 +242,8 @@ mod tests {
 
         // Serialize CREATE3args with UNCHECKED mode
         use crate::protocol::v3::nfs::{
-            createhow3, fhandle3, filename3, nfstime3, sattr3, set_atime, set_gid3,
-            set_mode3, set_mtime, set_size3, set_uid3, CREATE3args,
+            CREATE3args, createhow3, fhandle3, filename3, nfstime3, sattr3, set_atime, set_gid3,
+            set_mode3, set_mtime, set_size3, set_uid3,
         };
         use xdr_codec::Pack;
 
@@ -269,6 +272,9 @@ mod tests {
         // Call CREATE - should succeed (UNCHECKED allows overwriting)
         let result = handle_create(12345, &args_buf, fs.as_ref()).await;
 
-        assert!(result.is_ok(), "CREATE UNCHECKED should succeed even if file exists");
+        assert!(
+            result.is_ok(),
+            "CREATE UNCHECKED should succeed even if file exists"
+        );
     }
 }

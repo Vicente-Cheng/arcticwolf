@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use tracing::{debug, warn};
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS REMOVE request
@@ -22,7 +22,11 @@ use crate::protocol::v3::rpc::RpcMessage;
 ///
 /// # Returns
 /// Serialized RPC reply with REMOVE3res
-pub async fn handle_remove(xid: u32, args_data: &[u8], filesystem: &dyn Filesystem) -> Result<BytesMut> {
+pub async fn handle_remove(
+    xid: u32,
+    args_data: &[u8],
+    filesystem: &dyn Filesystem,
+) -> Result<BytesMut> {
     debug!("NFS REMOVE: xid={}", xid);
 
     // Parse arguments
@@ -35,7 +39,7 @@ pub async fn handle_remove(xid: u32, args_data: &[u8], filesystem: &dyn Filesyst
     );
 
     // Get directory attributes before removal (for wcc_data)
-    let dir_before = filesystem.getattr(&args.dir.0).await.ok();
+    let _dir_before = filesystem.getattr(&args.dir.0).await.ok();
 
     // Perform remove operation
     match filesystem.remove(&args.dir.0, &args.name.0).await {
@@ -63,7 +67,8 @@ pub async fn handle_remove(xid: u32, args_data: &[u8], filesystem: &dyn Filesyst
                 nfsstat3::NFS3ERR_NOENT
             } else if error_string.contains("permission") || error_string.contains("Permission") {
                 nfsstat3::NFS3ERR_ACCES
-            } else if error_string.contains("directory") || error_string.contains("Is a directory") {
+            } else if error_string.contains("directory") || error_string.contains("Is a directory")
+            {
                 nfsstat3::NFS3ERR_ISDIR
             } else {
                 // Try to get std::io::Error from anyhow::Error
@@ -79,7 +84,11 @@ pub async fn handle_remove(xid: u32, args_data: &[u8], filesystem: &dyn Filesyst
             };
 
             // Try to get current directory attributes for wcc_data
-            let dir_after = filesystem.getattr(&args.dir.0).await.ok().map(|attr| NfsMessage::fsal_to_fattr3(&attr));
+            let dir_after = filesystem
+                .getattr(&args.dir.0)
+                .await
+                .ok()
+                .map(|attr| NfsMessage::fsal_to_fattr3(&attr));
 
             create_remove_response(xid, status, dir_after)
         }

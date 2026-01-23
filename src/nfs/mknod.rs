@@ -12,7 +12,7 @@ use bytes::BytesMut;
 use tracing::{debug, warn};
 
 use crate::fsal::{FileType, Filesystem};
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS MKNOD procedure (11)
@@ -26,7 +26,11 @@ use crate::protocol::v3::rpc::RpcMessage;
 ///
 /// # Returns
 /// Serialized MKNOD3res wrapped in RPC reply
-pub async fn handle_mknod(xid: u32, args_data: &[u8], filesystem: &dyn Filesystem) -> Result<BytesMut> {
+pub async fn handle_mknod(
+    xid: u32,
+    args_data: &[u8],
+    filesystem: &dyn Filesystem,
+) -> Result<BytesMut> {
     debug!("NFS MKNOD: xid={}", xid);
 
     // Parse arguments
@@ -45,12 +49,18 @@ pub async fn handle_mknod(xid: u32, args_data: &[u8], filesystem: &dyn Filesyste
     // Extract file type, mode, and device numbers from union
     let (file_type, mode, rdev) = match &args.what {
         crate::protocol::v3::nfs::mknoddata3::NF3CHR(dev) => {
-            debug!("  Creating character device: major={}, minor={}", dev.major, dev.minor);
+            debug!(
+                "  Creating character device: major={}, minor={}",
+                dev.major, dev.minor
+            );
             let mode = extract_mode(&dev.dev_attributes);
             (FileType::CharDevice, mode, (dev.major, dev.minor))
         }
         crate::protocol::v3::nfs::mknoddata3::NF3BLK(dev) => {
-            debug!("  Creating block device: major={}, minor={}", dev.major, dev.minor);
+            debug!(
+                "  Creating block device: major={}, minor={}",
+                dev.major, dev.minor
+            );
             let mode = extract_mode(&dev.dev_attributes);
             (FileType::BlockDevice, mode, (dev.major, dev.minor))
         }
@@ -69,7 +79,10 @@ pub async fn handle_mknod(xid: u32, args_data: &[u8], filesystem: &dyn Filesyste
     let name = &args.name.0;
 
     // Perform mknod operation
-    match filesystem.mknod(&args.where_dir.0, &name, file_type, mode, rdev).await {
+    match filesystem
+        .mknod(&args.where_dir.0, name, file_type, mode, rdev)
+        .await
+    {
         Ok(handle) => {
             debug!("MKNOD OK: created {:?}", name);
 
@@ -199,7 +212,10 @@ fn map_error_to_status(error: &anyhow::Error) -> nfsstat3 {
 
     if error_msg.contains("not found") || error_msg.contains("no such file") {
         nfsstat3::NFS3ERR_NOENT // 2 - No such file or directory
-    } else if error_msg.contains("permission denied") || error_msg.contains("access denied") || error_msg.contains("operation not permitted") {
+    } else if error_msg.contains("permission denied")
+        || error_msg.contains("access denied")
+        || error_msg.contains("operation not permitted")
+    {
         nfsstat3::NFS3ERR_ACCES // 13 - Permission denied
     } else if error_msg.contains("exists") || error_msg.contains("already") {
         nfsstat3::NFS3ERR_EXIST // 17 - File exists

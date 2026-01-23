@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use tracing::{debug, warn};
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{cookieverf3, fileid3, nfsstat3, NfsMessage, COOKIEVERFSIZE};
+use crate::protocol::v3::nfs::{COOKIEVERFSIZE, NfsMessage, cookieverf3, fileid3, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS READDIR request
@@ -19,7 +19,11 @@ use crate::protocol::v3::rpc::RpcMessage;
 ///
 /// # Returns
 /// Serialized RPC reply with READDIR3res
-pub async fn handle_readdir(xid: u32, args_data: &[u8], filesystem: &dyn Filesystem) -> Result<BytesMut> {
+pub async fn handle_readdir(
+    xid: u32,
+    args_data: &[u8],
+    filesystem: &dyn Filesystem,
+) -> Result<BytesMut> {
     debug!("NFS READDIR: xid={}", xid);
 
     // Parse arguments
@@ -43,7 +47,10 @@ pub async fn handle_readdir(xid: u32, args_data: &[u8], filesystem: &dyn Filesys
     };
 
     // Read directory entries
-    let (entries, eof) = match filesystem.readdir(&args.dir.0, args.cookie, args.count).await {
+    let (entries, eof) = match filesystem
+        .readdir(&args.dir.0, args.cookie, args.count)
+        .await
+    {
         Ok(result) => result,
         Err(e) => {
             warn!("READDIR failed: {}", e);
@@ -63,7 +70,7 @@ pub async fn handle_readdir(xid: u32, args_data: &[u8], filesystem: &dyn Filesys
 
     // 2. post_op_attr (dir_attributes)
     // post_op_attr = bool (1 = present) + fattr3 (if present)
-    true.pack(&mut buf)?;  // attributes_follow = TRUE
+    true.pack(&mut buf)?; // attributes_follow = TRUE
     dir_attr.pack(&mut buf)?;
 
     // 3. cookieverf

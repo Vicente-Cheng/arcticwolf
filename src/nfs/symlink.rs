@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use tracing::{debug, warn};
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle SYMLINK procedure
@@ -19,7 +19,11 @@ use crate::protocol::v3::rpc::RpcMessage;
 ///
 /// # Returns
 /// Serialized SYMLINK3res response
-pub async fn handle_symlink(xid: u32, args_data: &[u8], filesystem: &dyn Filesystem) -> Result<BytesMut> {
+pub async fn handle_symlink(
+    xid: u32,
+    args_data: &[u8],
+    filesystem: &dyn Filesystem,
+) -> Result<BytesMut> {
     debug!("NFS SYMLINK: xid={}", xid);
 
     // Parse arguments
@@ -36,7 +40,14 @@ pub async fn handle_symlink(xid: u32, args_data: &[u8], filesystem: &dyn Filesys
     let dir_before = filesystem.getattr(&args.where_dir.0).await.ok();
 
     // Perform symlink operation
-    match filesystem.symlink(&args.where_dir.0, &args.name.0, &args.symlink.symlink_data.0).await {
+    match filesystem
+        .symlink(
+            &args.where_dir.0,
+            &args.name.0,
+            &args.symlink.symlink_data.0,
+        )
+        .await
+    {
         Ok(new_symlink_handle) => {
             debug!("SYMLINK OK: created symlink '{}'", args.name.0);
 

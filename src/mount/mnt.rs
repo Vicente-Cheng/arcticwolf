@@ -8,7 +8,7 @@ use bytes::BytesMut;
 use tracing::{debug, info};
 
 use crate::protocol::v3::mount::MountMessage;
-use crate::protocol::v3::rpc::{rpc_call_msg, RpcMessage};
+use crate::protocol::v3::rpc::{RpcMessage, rpc_call_msg};
 
 /// Handle MOUNT MNT procedure
 ///
@@ -27,8 +27,11 @@ pub async fn handle(
         call.xid, call.prog, call.vers, call.proc_
     );
 
-    debug!("MOUNT MNT: args_data = {} bytes, hex: {:02x?}",
-           args_data.len(), &args_data[..args_data.len().min(50)]);
+    debug!(
+        "MOUNT MNT: args_data = {} bytes, hex: {:02x?}",
+        args_data.len(),
+        &args_data[..args_data.len().min(50)]
+    );
 
     // Deserialize the directory path from the arguments
     let dirpath = MountMessage::deserialize_dirpath(args_data)?;
@@ -49,7 +52,10 @@ pub async fn handle(
     // Create successful mount response
     let mount_res = MountMessage::create_mount_ok(fhandle_bytes.clone());
 
-    debug!("MOUNT MNT: Created mountres3 with {} byte handle", fhandle_bytes.len());
+    debug!(
+        "MOUNT MNT: Created mountres3 with {} byte handle",
+        fhandle_bytes.len()
+    );
 
     // Create RPC reply header (SUCCESS with no data)
     let rpc_reply = RpcMessage::create_null_reply(call.xid);
@@ -58,8 +64,11 @@ pub async fn handle(
     // Serialize MOUNT result
     let mount_data = MountMessage::serialize_mountres3(&mount_res)?;
 
-    debug!("MOUNT MNT: Serialized mount_data = {} bytes, hex: {:02x?}",
-           mount_data.len(), &mount_data[..mount_data.len().min(100)]);
+    debug!(
+        "MOUNT MNT: Serialized mount_data = {} bytes, hex: {:02x?}",
+        mount_data.len(),
+        &mount_data[..mount_data.len().min(100)]
+    );
 
     // Combine RPC header + MOUNT result
     // RPC wire format: [RPC Reply Header][Procedure Result Data]
@@ -71,4 +80,3 @@ pub async fn handle(
 
     Ok(response)
 }
-

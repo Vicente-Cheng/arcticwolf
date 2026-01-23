@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use tracing::debug;
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS FSSTAT procedure (procedure 18)
@@ -77,7 +77,7 @@ pub async fn handle_fsstat(
     (nfsstat3::NFS3_OK as i32).pack(&mut buf)?;
 
     // 2. post_op_attr (obj_attributes)
-    true.pack(&mut buf)?;  // attributes_follow = TRUE
+    true.pack(&mut buf)?; // attributes_follow = TRUE
     nfs_attrs.pack(&mut buf)?;
 
     // 3. FSSTAT fields
@@ -152,6 +152,9 @@ mod tests {
         // Call FSSTAT
         let result = handle_fsstat(12345, &args_buf, fs.as_ref()).await;
 
-        assert!(result.is_ok(), "FSSTAT should return error response (not panic)");
+        assert!(
+            result.is_ok(),
+            "FSSTAT should return error response (not panic)"
+        );
     }
 }

@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use tracing::{debug, warn};
 
 use crate::fsal::Filesystem;
-use crate::protocol::v3::nfs::{nfsstat3, NfsMessage};
+use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
 
 /// Handle NFS MKDIR request
@@ -21,7 +21,11 @@ use crate::protocol::v3::rpc::RpcMessage;
 ///
 /// # Returns
 /// Serialized RPC reply with MKDIR3res
-pub async fn handle_mkdir(xid: u32, args_data: &[u8], filesystem: &dyn Filesystem) -> Result<BytesMut> {
+pub async fn handle_mkdir(
+    xid: u32,
+    args_data: &[u8],
+    filesystem: &dyn Filesystem,
+) -> Result<BytesMut> {
     debug!("NFS MKDIR: xid={}", xid);
 
     // Parse arguments
@@ -34,7 +38,7 @@ pub async fn handle_mkdir(xid: u32, args_data: &[u8], filesystem: &dyn Filesyste
     );
 
     // Get parent directory attributes before operation (for wcc_data)
-    let dir_before = filesystem.getattr(&args.where_dir.0).await.ok();
+    let _dir_before = filesystem.getattr(&args.where_dir.0).await.ok();
 
     // Extract mode from sattr3, default to 0755
     let mode = match args.attributes.mode {
@@ -43,7 +47,10 @@ pub async fn handle_mkdir(xid: u32, args_data: &[u8], filesystem: &dyn Filesyste
     };
 
     // Perform mkdir operation
-    match filesystem.mkdir(&args.where_dir.0, &args.name.0, mode).await {
+    match filesystem
+        .mkdir(&args.where_dir.0, &args.name.0, mode)
+        .await
+    {
         Ok(new_dir_handle) => {
             debug!("MKDIR OK: created directory '{}'", args.name.0);
 
@@ -78,7 +85,9 @@ pub async fn handle_mkdir(xid: u32, args_data: &[u8], filesystem: &dyn Filesyste
 
             // Determine appropriate error code
             let error_string = e.to_string();
-            let status = if error_string.contains("already exists") || error_string.contains("File exists") {
+            let status = if error_string.contains("already exists")
+                || error_string.contains("File exists")
+            {
                 nfsstat3::NFS3ERR_EXIST
             } else if error_string.contains("not found") || error_string.contains("No such") {
                 nfsstat3::NFS3ERR_NOENT
@@ -99,7 +108,11 @@ pub async fn handle_mkdir(xid: u32, args_data: &[u8], filesystem: &dyn Filesyste
             };
 
             // Try to get current parent directory attributes for wcc_data
-            let dir_after = filesystem.getattr(&args.where_dir.0).await.ok().map(|attr| NfsMessage::fsal_to_fattr3(&attr));
+            let dir_after = filesystem
+                .getattr(&args.where_dir.0)
+                .await
+                .ok()
+                .map(|attr| NfsMessage::fsal_to_fattr3(&attr));
 
             create_mkdir_response(xid, status, None, None, dir_after)
         }
@@ -127,7 +140,7 @@ fn create_mkdir_response(
         // 2. post_op_fh3 (new directory handle)
         match new_dir_handle {
             Some(handle) => {
-                true.pack(&mut buf)?;  // handle follows
+                true.pack(&mut buf)?; // handle follows
                 (handle.len() as u32).pack(&mut buf)?;
                 buf.extend_from_slice(&handle);
                 // Add padding
@@ -135,18 +148,18 @@ fn create_mkdir_response(
                 buf.extend_from_slice(&vec![0u8; padding]);
             }
             None => {
-                false.pack(&mut buf)?;  // no handle
+                false.pack(&mut buf)?; // no handle
             }
         }
 
         // 3. post_op_attr (new directory attributes)
         match new_dir_attr {
             Some(attr) => {
-                true.pack(&mut buf)?;  // attributes follow
+                true.pack(&mut buf)?; // attributes follow
                 attr.pack(&mut buf)?;
             }
             None => {
-                false.pack(&mut buf)?;  // no attributes
+                false.pack(&mut buf)?; // no attributes
             }
         }
     }
