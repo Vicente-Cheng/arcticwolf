@@ -2,6 +2,7 @@ EARTHLY ?= earthly
 
 # Docker image configuration
 IMAGE_NAME ?= arcticwolf
+IMAGE_REPO ?= freezevicente
 IMAGE_TAG ?= latest
 
 # VM configuration
@@ -44,6 +45,10 @@ test:
 # Run clippy and rustfmt checks
 lint:
 	$(EARTHLY) +lint
+
+# Build Docker image
+image:
+	${EARTHLY} +image --IMAGE_REPO=$(IMAGE_REPO) --IMAGE_TAG=$(IMAGE_TAG)
 
 # Build and start both server and VM
 start-test-env:
