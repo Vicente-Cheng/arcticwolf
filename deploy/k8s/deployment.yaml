@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: arcticwolf
+  labels:
+    app: arcticwolf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: arcticwolf
+  template:
+    metadata:
+      labels:
+        app: arcticwolf
+    spec:
+      containers:
+        - name: arcticwolf
+          image: freezevicente/arcticwolf:latest
+          ports:
+            - containerPort: 4000
+              name: nfs
+              protocol: TCP
+          env:
+            - name: RUST_LOG
+              value: "info"
+          volumeMounts:
+            - name: nfs-exports
+              mountPath: /tmp/nfs_exports
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: nfs-exports
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcticwolf
+  labels:
+    app: arcticwolf
+spec:
+  type: NodePort
+  ports:
+    - port: 4000
+      targetPort: 4000
+      nodePort: 30400
+      protocol: TCP
+      name: nfs
+  selector:
+    app: arcticwolf
