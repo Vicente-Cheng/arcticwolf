@@ -1,0 +1,99 @@
+name: NFS Test Factory
+
+on:
+  workflow_call:
+
+jobs:
+  nfstest:
+    name: Run NFS Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Earthly
+        uses: earthly/actions-setup@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker image
+        run: |
+          make image
+          docker tag freezevicente/arcticwolf:latest arcticwolf:test
+
+      - name: Install k3s
+        run: |
+          curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
+          sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+          echo "KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> $GITHUB_ENV
+
+      - name: Wait for k3s to be ready
+        run: |
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          kubectl wait --for=condition=Ready nodes --all --timeout=120s
+          kubectl get nodes
+
+      - name: Load image into k3s
+        run: |
+          docker save arcticwolf:test | sudo k3s ctr images import -
+
+      - name: Deploy arcticwolf
+        run: |
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          # Update image in deployment to use local image
+          sed -i 's|freezevicente/arcticwolf:latest|arcticwolf:test|g' deploy/k8s/deployment.yaml
+          sed -i '/imagePullPolicy/d' deploy/k8s/deployment.yaml
+          # Add imagePullPolicy: Never for local image
+          sed -i 's|image: arcticwolf:test|image: arcticwolf:test\n          imagePullPolicy: Never|g' deploy/k8s/deployment.yaml
+          # Set RUST_LOG to debug for testing
+          sed -i 's|value: "info"|value: "debug"|g' deploy/k8s/deployment.yaml
+          kubectl apply -f deploy/k8s/deployment.yaml
+          kubectl wait --for=condition=Ready pod -l app=arcticwolf --timeout=120s
+
+      - name: Get service info
+        run: |
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          kubectl get pods -o wide
+          kubectl get svc arcticwolf
+          NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+          echo "NODE_IP=${NODE_IP}" >> $GITHUB_ENV
+          echo "NFS server available at ${NODE_IP}:30400"
+
+      - name: Install NFS client tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nfs-common
+
+      - name: Mount NFS
+        run: |
+          sudo mkdir -p /mnt/nfs
+          sudo mount -t nfs -o port=30400,mountport=30400,nfsvers=3,tcp,nolock ${NODE_IP}:/ /mnt/nfs
+          echo "NFS mounted successfully"
+          ls -la /mnt/nfs/
+
+      # skip test open until we start to review the failures
+      # read/write tests are mandatory and must pass
+      - name: Run NFS POSIX tests
+        run: |
+          docker run --network host --privileged --rm \
+            registry.opensuse.org/home/vcheng/containers/containers/nfstester:latest \
+            nfstest_posix -s localhost -p 30400 --nfsversion=3 \
+            -o mountport=30400,nolock,noresvport,nordirplus \
+            --runtest=read,write
+
+      - name: Get pod logs
+        if: always()
+        run: |
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          echo "=== Pod Status ==="
+          kubectl get pods -l app=arcticwolf -o wide
+          echo ""
+          echo "=== Pod Logs ==="
+          kubectl logs -l app=arcticwolf --tail=200
+
+      - name: Cleanup
+        if: always()
+        run: |
+          sudo umount /mnt/nfs || true
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          kubectl delete -f deploy/k8s/deployment.yaml || true

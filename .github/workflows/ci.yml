@@ -9,7 +9,7 @@ on:
     types: [opened, reopened, synchronize]
 
 jobs:
-  build:
+  run-build:
     name: Build
     runs-on: ubuntu-latest
     steps:
@@ -24,7 +24,7 @@ jobs:
       - name: Run build
         run: make build
 
-  test:
+  run-unit-test:
     name: Test
     runs-on: ubuntu-latest
     steps:
@@ -39,7 +39,7 @@ jobs:
       - name: Run tests
         run: make test
 
-  lint:
+  run-lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
@@ -53,3 +53,9 @@ jobs:
 
       - name: Run lint
         run: make lint
+
+  run-nfstest:
+    name: NFS Integration Test
+    needs: [run-build, run-unit-test, run-lint]
+    uses: ./.github/workflows/nfstest-factory.yml
+    secrets: inherit
