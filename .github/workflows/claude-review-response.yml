@@ -1,0 +1,109 @@
+name: Claude Review Response
+
+# Dev agent: reacts to each submitted review on its own PRs by fixing,
+# declining, or escalating every point. Reviewers may be people or bots.
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: claude-review-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  # Pin gh to the repo running the workflow; in a fork, gh may otherwise
+  # resolve to the parent repo.
+  GH_REPO: ${{ github.repository }}
+  # Bots whose reviews the dev agent should act on. claude[bot] is the
+  # agent's own identity too; its own replies are filtered by marker below.
+  REVIEW_BOTS: copilot-pull-request-reviewer[bot],coderabbitai[bot],chatgpt-codex-connector[bot],claude[bot]
+
+jobs:
+  respond:
+    # Only agent-owned PRs whose branch lives in this repo; humans must be
+    # maintainers.
+    if: >-
+      startsWith(github.event.pull_request.head.ref, 'claude/issue-') &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (
+        github.event.review.user.type == 'Bot' ||
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.review.author_association)
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - name: Skip the agent's own replies and unknown bots
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWER: ${{ github.event.review.user.login }}
+          REVIEWER_TYPE: ${{ github.event.review.user.type }}
+          REVIEW_BODY: ${{ github.event.review.body }}
+          PR: ${{ github.event.pull_request.number }}
+          REVIEW_ID: ${{ github.event.review.id }}
+        run: |
+          run=true
+          if [ "$REVIEWER_TYPE" = "Bot" ] && ! printf ',%s,' "$REVIEW_BOTS" | grep -qF ",$REVIEWER,"; then
+            echo "Ignoring review from unlisted bot $REVIEWER"
+            run=false
+          fi
+          # A thread reply is recorded as its own review; skip those when
+          # they are the agent's (body or every comment carries the marker).
+          if [ "$run" = true ]; then
+            case "$REVIEW_BODY" in *'<!-- claude-dev-agent -->'*) run=false ;; esac
+          fi
+          if [ "$run" = true ] && [ -z "$REVIEW_BODY" ]; then
+            unmarked=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/reviews/$REVIEW_ID/comments" --paginate \
+              --jq '[.[] | select(.body | contains("<!-- claude-dev-agent -->") | not)] | length' \
+              | awk '{s+=$1} END {print s+0}')
+            [ "$unmarked" -eq 0 ] && run=false
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR branch
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          # Pushes must use the action's Claude App token, not GITHUB_TOKEN:
+          # pushes made with GITHUB_TOKEN do not trigger CI.
+          persist-credentials: false
+
+      - name: Setup Earthly
+        if: steps.gate.outputs.run == 'true'
+        uses: earthly/actions-setup@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run dev agent
+        if: steps.gate.outputs.run == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: ${{ env.REVIEW_BOTS }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR: ${{ github.event.pull_request.number }}
+            BRANCH: ${{ github.event.pull_request.head.ref }}
+            REVIEW_ID: ${{ github.event.review.id }}
+            REVIEWER: ${{ github.event.review.user.login }}
+
+            Read .github/claude/dev-agent.md and follow its "Responding to
+            a review" section for this review.
+
+            Commands (keep the path first; the allowlist matches on it):
+            - review body: gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews/${{ github.event.review.id }}
+            - its inline comments: gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews/${{ github.event.review.id }}/comments
+            - reply in a thread: gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/<comment_id>/replies -F body=@<file>
+            - PR-level comment: gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body-file <file>
+            - push: git push origin HEAD
+          claude_args: >-
+            --max-turns 120
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(make lint),Bash(make test),Bash(make build),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push origin HEAD),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews/:*),Bash(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/:*)"

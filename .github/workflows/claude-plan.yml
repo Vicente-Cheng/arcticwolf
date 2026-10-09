@@ -1,0 +1,60 @@
+name: Claude Plan
+
+# Plan agent: answers new issues and follow-up discussion with an
+# implementation plan. Read-only; the dev agent starts once a maintainer
+# adds the `plan-approved` label (see claude-dev.yml).
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+# Pin gh to the repo running the workflow; in a fork, gh may otherwise
+# resolve to the parent repo.
+env:
+  GH_REPO: ${{ github.repository }}
+
+concurrency:
+  group: claude-plan-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    # Only maintainers drive the agent, only on issues (not PRs), never on
+    # bot comments (including the agent's own), and stop once approved.
+    if: >-
+      !github.event.issue.pull_request &&
+      !contains(github.event.issue.labels.*.name, 'plan-approved') &&
+      (
+        (github.event_name == 'issues' &&
+         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)) ||
+        (github.event_name == 'issue_comment' &&
+         github.event.comment.user.type != 'Bot' &&
+         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run plan agent
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            ISSUE: ${{ github.event.issue.number }}
+
+            Read .github/claude/plan-agent.md and follow it for this issue.
+          claude_args: >-
+            --max-turns 40
+            --allowedTools "Read,Glob,Grep,Bash(gh issue view:*),Bash(gh issue comment:*)"
+            --disallowedTools "Edit,Write,NotebookEdit"
