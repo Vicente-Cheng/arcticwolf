@@ -84,10 +84,11 @@ cmd_verify() {
   # ExportRegistry, and MOUNT EXPORT (proc 5) enumerates configured
   # exports. Verify both protocol pieces against the two exports
   # defined in deploy/k8s/deployment.yaml.
-  log "Verify MOUNT EXPORT lists both exports"
+  log "Verify MOUNT EXPORT lists every export"
   showmount -e "${ip}"
   showmount -e "${ip}" | grep -E '^/data\b'
   showmount -e "${ip}" | grep -E '^/backup\b'
+  showmount -e "${ip}" | grep -E '^/scratch\b'
 
   log "Mount /data export"
   sudo mkdir -p /mnt/nfs_data
@@ -175,6 +176,78 @@ cmd_verify() {
     exit 1
   fi
   echo "unknown dirpath correctly rejected"
+
+  # The server now evaluates every call against the AUTH_SYS credential:
+  # POSIX mode bits on the object, ownership of new objects, and the
+  # export's squash policy. Exercise each with a real Linux client, as
+  # root (which /data leaves unsquashed) and as an ordinary user.
+  log "Verify permission checks against the caller credential"
+  local user
+  user=$(id -nu 1000 2>/dev/null || true)
+  if [ -z "${user}" ]; then
+    sudo useradd -u 1000 -M -s /bin/sh nfsperm
+    user=nfsperm
+  fi
+  local ugid
+  ugid=$(id -g "${user}")
+  as_user() { sudo -u "${user}" "$@"; }
+  must_fail() {
+    if "$@" 2>/dev/null; then
+      echo "FAILURE: expected to be denied: $*" >&2
+      exit 1
+    fi
+  }
+  expect_owner() {
+    local got
+    got=$(stat -c %u:%g "$1")
+    if [ "${got}" != "$2" ]; then
+      echo "FAILURE: $1 owned by ${got}, expected $2" >&2
+      exit 1
+    fi
+  }
+
+  local d=/mnt/nfs_data/perm
+  sudo rm -rf "${d}"
+  sudo mkdir -m 0777 "${d}"
+  sudo bash -c "echo secret > ${d}/secret && chmod 600 ${d}/secret"
+  sudo bash -c "echo root > ${d}/rootfile && chmod 644 ${d}/rootfile"
+
+  # New objects belong to the caller, not to the daemon.
+  as_user touch "${d}/mine"
+  as_user mkdir "${d}/minedir"
+  expect_owner "${d}/mine" "1000:${ugid}"
+  expect_owner "${d}/minedir" "1000:${ugid}"
+
+  # Mode bits: 0600 root file is unreadable, 0644 is readable but not
+  # writable, by a plain user.
+  must_fail as_user cat "${d}/secret"
+  as_user cat "${d}/rootfile" >/dev/null
+  must_fail as_user sh -c "echo x >> ${d}/rootfile"
+
+  # chmod/chown: the owner may chmod but not give the file away; root may.
+  as_user chmod 600 "${d}/mine"
+  must_fail as_user chown 0 "${d}/mine"
+  sudo chown 2000:2000 "${d}/mine"
+  expect_owner "${d}/mine" "2000:2000"
+
+  # Sticky bit: a plain user cannot remove someone else's entry but can
+  # still remove its own.
+  sudo chmod 1777 "${d}"
+  must_fail as_user rm "${d}/rootfile"
+  as_user rmdir "${d}/minedir"
+  echo "permission checks behave as expected on /data"
+
+  log "Verify root squash on /scratch"
+  sudo mkdir -p /mnt/nfs_scratch
+  sudo mount -t nfs -o nfsvers=3,tcp,nolock "${ip}:/scratch" /mnt/nfs_scratch
+  sudo touch /mnt/nfs_scratch/byroot
+  expect_owner /mnt/nfs_scratch/byroot "65534:65534"
+  as_user touch /mnt/nfs_scratch/byuser
+  expect_owner /mnt/nfs_scratch/byuser "1000:${ugid}"
+  # Squashed root is just nobody: it cannot read another user's 0600 file.
+  as_user chmod 600 /mnt/nfs_scratch/byuser
+  must_fail sudo cat /mnt/nfs_scratch/byuser
+  echo "root squash behaves as expected on /scratch"
 }
 
 # The nfstester image is amd64-only; on an arm64 host this relies on an
@@ -199,6 +272,7 @@ cmd_cleanup() {
   log "Cleanup"
   sudo umount /mnt/nfs_data 2>/dev/null || true
   sudo umount /mnt/nfs_backup 2>/dev/null || true
+  sudo umount /mnt/nfs_scratch 2>/dev/null || true
   render_manifest | kubectl delete --ignore-not-found -f - || true
   kubectl wait --for=delete pod -l app=arcticwolf --timeout=60s 2>/dev/null || true
 }
