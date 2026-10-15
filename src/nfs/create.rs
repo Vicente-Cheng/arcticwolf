@@ -53,7 +53,8 @@ pub async fn handle_create(
     }
 
     // Creating an entry needs write + search permission on the directory.
-    if let Err(status) = super::access_check::require(
+    // The attributes double as the pre-op view for ownership inheritance.
+    let dir_before = match super::access_check::require(
         filesystem,
         &args.where_dir.0,
         cred,
@@ -61,13 +62,13 @@ pub async fn handle_create(
     )
     .await
     {
-        debug!("CREATE denied: {:?}", status);
-        let res_data = NfsMessage::create_create_error_response(status)?;
-        return RpcMessage::create_success_reply_with_data(xid, res_data);
-    }
-
-    // Get directory attributes before create (for wcc_data)
-    let _before_dir_attrs = filesystem.getattr(&args.where_dir.0).await.ok();
+        Ok(attrs) => attrs,
+        Err(status) => {
+            debug!("CREATE denied: {:?}", status);
+            let res_data = NfsMessage::create_create_error_response(status)?;
+            return RpcMessage::create_success_reply_with_data(xid, res_data);
+        }
+    };
 
     // Create the file based on mode
     let file_handle = match &args.how {
@@ -125,6 +126,16 @@ pub async fn handle_create(
             }
         }
     };
+
+    // The daemon created the file as itself; hand it to the caller.
+    super::access_check::adopt(
+        filesystem,
+        &args.where_dir.0,
+        &dir_before,
+        &file_handle,
+        cred,
+    )
+    .await;
 
     // Get file attributes
     let file_attrs = match filesystem.getattr(&file_handle).await {
@@ -200,6 +211,56 @@ mod tests {
     use crate::fsal::BackendConfig;
     use std::fs;
     use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_create_hands_file_to_caller() {
+        if unsafe { libc::geteuid() } != 0 {
+            eprintln!("skipping: needs root to chown to another uid");
+            return;
+        }
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        let temp_dir = TempDir::new().unwrap();
+        // The tempdir is 0700 and root-owned; uid 1000 needs w+x on it.
+        fs::set_permissions(temp_dir.path(), PermissionsExt::from_mode(0o777)).unwrap();
+        let config = BackendConfig::Local {
+            path: temp_dir.path().to_path_buf(),
+        };
+        let fs = config.create_filesystem(1).unwrap();
+        let root_handle = fs.root_file_handle();
+
+        use crate::protocol::v3::nfs::{
+            CREATE3args, createhow3, fhandle3, filename3, nfstime3, sattr3, set_atime, set_gid3,
+            set_mode3, set_mtime, set_size3, set_uid3,
+        };
+        use xdr_codec::Pack;
+        let args = CREATE3args {
+            where_dir: fhandle3(root_handle),
+            name: filename3("mine.txt".to_string()),
+            how: createhow3::UNCHECKED(sattr3 {
+                mode: set_mode3::SET_MODE(0o644),
+                uid: set_uid3::SET_UID(0),
+                gid: set_gid3::SET_GID(0),
+                size: set_size3::SET_SIZE(0),
+                atime: set_atime::SET_TO_CLIENT_TIME(nfstime3 {
+                    seconds: 0,
+                    nseconds: 0,
+                }),
+                mtime: set_mtime::SET_TO_CLIENT_TIME(nfstime3 {
+                    seconds: 0,
+                    nseconds: 0,
+                }),
+            }),
+        };
+        let mut args_buf = Vec::new();
+        args.pack(&mut args_buf).unwrap();
+
+        // LocalFilesystem's registry view never squashes, so uid 1000 stays.
+        handle_create(1, &args_buf, fs.as_ref(), &Credentials::sys(1000, 1001))
+            .await
+            .unwrap();
+        let meta = fs::metadata(temp_dir.path().join("mine.txt")).unwrap();
+        assert_eq!((meta.uid(), meta.gid()), (1000, 1001));
+    }
 
     #[tokio::test]
     async fn test_create_file() {

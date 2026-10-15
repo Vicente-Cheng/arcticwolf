@@ -442,13 +442,25 @@ impl Filesystem for LocalFilesystem {
     ) -> Result<()> {
         let path = self.resolve_handle(handle)?;
 
-        // Note: chown requires root privileges on Unix systems
-        // For now, we'll just log this and return success
-        // In production, you might want to use nix::unistd::chown
-        debug!(
-            "SETATTR: {:?} uid={:?} gid={:?} (not implemented)",
-            path, uid, gid
-        );
+        // `lchown` so a symlink's own owner changes rather than its
+        // target's. -1 leaves the respective id untouched. Changing the
+        // owner needs CAP_CHOWN, so this fails with EPERM when the daemon
+        // is not running as root; the handler maps that to NFS3ERR_PERM.
+        let c_path = std::ffi::CString::new(path.as_os_str().as_encoded_bytes())
+            .context("path contains NUL")?;
+        let uid_arg = uid.map_or(u32::MAX, |u| u) as libc::uid_t;
+        let gid_arg = gid.map_or(u32::MAX, |g| g) as libc::gid_t;
+        tokio::task::spawn_blocking(move || {
+            if unsafe { libc::lchown(c_path.as_ptr(), uid_arg, gid_arg) } != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        })
+        .await
+        .context("spawn_blocking failed")?
+        .context(format!("Failed to chown {:?} to {:?}:{:?}", path, uid, gid))?;
+
+        debug!("SETATTR: {:?} uid={:?} gid={:?}", path, uid, gid);
 
         Ok(())
     }
@@ -957,6 +969,37 @@ mod tests {
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let fs = LocalFilesystem::new(temp_dir.path(), 1).expect("Failed to create filesystem");
         (fs, temp_dir)
+    }
+
+    /// chown to a different uid needs CAP_CHOWN, which the test process
+    /// only has inside the root build container.
+    fn running_as_root() -> bool {
+        unsafe { libc::geteuid() == 0 }
+    }
+
+    #[tokio::test]
+    async fn test_setattr_owner_changes_uid_gid_without_following_symlinks() {
+        if !running_as_root() {
+            eprintln!("skipping: needs root to chown to another uid");
+            return;
+        }
+        let (fs, temp_dir) = create_test_fs();
+        let root = fs.root_file_handle();
+        let file = fs.create(&root, "owned", 0o644).await.unwrap();
+        let link = fs.symlink(&root, "link", "owned").await.unwrap();
+
+        fs.setattr_owner(&file, Some(1000), Some(1001))
+            .await
+            .unwrap();
+        let meta = std::fs::metadata(temp_dir.path().join("owned")).unwrap();
+        assert_eq!((meta.uid(), meta.gid()), (1000, 1001));
+
+        // Only the gid, and only on the link itself.
+        fs.setattr_owner(&link, None, Some(2000)).await.unwrap();
+        let link_meta = std::fs::symlink_metadata(temp_dir.path().join("link")).unwrap();
+        assert_eq!(link_meta.gid(), 2000);
+        let target_meta = std::fs::metadata(temp_dir.path().join("owned")).unwrap();
+        assert_eq!((target_meta.uid(), target_meta.gid()), (1000, 1001));
     }
 
     #[tokio::test]
