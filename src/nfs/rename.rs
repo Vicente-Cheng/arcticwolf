@@ -9,6 +9,7 @@ use tracing::{debug, warn};
 use crate::fsal::NfsBackend;
 use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
+use crate::rpc::auth::Credentials;
 
 /// Handle NFS RENAME request
 ///
@@ -25,6 +26,7 @@ pub async fn handle_rename(
     xid: u32,
     args_data: &[u8],
     filesystem: &dyn NfsBackend,
+    cred: &Credentials,
 ) -> Result<BytesMut> {
     debug!("NFS RENAME: xid={}", xid);
 
@@ -53,6 +55,47 @@ pub async fn handle_rename(
     }
     if let Err(status) = super::access_check::check_writable(filesystem, &args.to_dir.0) {
         debug!("RENAME denied: target dir belongs to a read-only export");
+        return create_rename_response(xid, status, None, None);
+    }
+
+    // Both directories are written: write + search permission on each,
+    // plus the sticky-bit ownership rule on the source entry.
+    let from_attrs = match super::access_check::require(
+        filesystem,
+        &args.from_dir.0,
+        cred,
+        super::perm::WRITE | super::perm::EXEC,
+    )
+    .await
+    {
+        Ok(attrs) => attrs,
+        Err(status) => {
+            debug!("RENAME denied on source dir: {:?}", status);
+            return create_rename_response(xid, status, None, None);
+        }
+    };
+    if args.from_dir.0 != args.to_dir.0
+        && let Err(status) = super::access_check::require(
+            filesystem,
+            &args.to_dir.0,
+            cred,
+            super::perm::WRITE | super::perm::EXEC,
+        )
+        .await
+    {
+        debug!("RENAME denied on target dir: {:?}", status);
+        return create_rename_response(xid, status, None, None);
+    }
+    if let Err(status) = super::access_check::check_sticky(
+        filesystem,
+        &args.from_dir.0,
+        &from_attrs,
+        &args.from_name.0,
+        cred,
+    )
+    .await
+    {
+        debug!("RENAME denied by sticky bit");
         return create_rename_response(xid, status, None, None);
     }
 
@@ -272,7 +315,7 @@ mod tests {
         to_name.pack(&mut args_buf).unwrap();
 
         // Call RENAME
-        let result = handle_rename(12345, &args_buf, &fs).await;
+        let result = handle_rename(12345, &args_buf, &fs, &Credentials::root()).await;
         assert!(result.is_ok(), "RENAME should succeed");
 
         // Verify file was renamed
@@ -321,7 +364,7 @@ mod tests {
         to_name.pack(&mut args_buf).unwrap();
 
         // Call RENAME
-        let result = handle_rename(12346, &args_buf, &fs).await;
+        let result = handle_rename(12346, &args_buf, &fs, &Credentials::root()).await;
         assert!(result.is_ok(), "RENAME should succeed");
 
         // Verify directory was renamed

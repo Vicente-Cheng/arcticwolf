@@ -10,6 +10,7 @@ use tracing::{debug, warn};
 use crate::fsal::NfsBackend;
 use crate::protocol::v3::nfs::{COOKIEVERFSIZE, NfsMessage, cookieverf3, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
+use crate::rpc::auth::Credentials;
 
 /// Handle NFS READDIRPLUS request
 ///
@@ -31,6 +32,7 @@ pub async fn handle_readdirplus(
     xid: u32,
     args_data: &[u8],
     filesystem: &dyn NfsBackend,
+    cred: &Credentials,
 ) -> Result<BytesMut> {
     debug!("NFS READDIRPLUS: xid={}", xid);
 
@@ -54,6 +56,15 @@ pub async fn handle_readdirplus(
             return RpcMessage::create_success_reply_with_data(xid, res_data);
         }
     };
+
+    // Listing needs read permission on the directory.
+    if let Err(status) =
+        super::access_check::require(filesystem, &args.dir.0, cred, super::perm::READ).await
+    {
+        debug!("READDIRPLUS denied: {:?}", status);
+        let res_data = NfsMessage::create_readdirplus_error_response(status)?;
+        return RpcMessage::create_success_reply_with_data(xid, res_data);
+    }
 
     // Read directory entries
     // Use dircount as the count parameter (RFC 1813 says dircount is for entry names)
@@ -211,7 +222,7 @@ mod tests {
         32768u32.pack(&mut args_buf).unwrap();
 
         // Call handler
-        let result = handle_readdirplus(1, &args_buf, &fs).await;
+        let result = handle_readdirplus(1, &args_buf, &fs, &Credentials::root()).await;
         assert!(result.is_ok());
 
         let response = result.unwrap();

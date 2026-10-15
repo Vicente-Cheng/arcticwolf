@@ -9,6 +9,7 @@ use tracing::debug;
 use crate::fsal::NfsBackend;
 use crate::protocol::v3::nfs::{NfsMessage, nfsstat3};
 use crate::protocol::v3::rpc::RpcMessage;
+use crate::rpc::auth::Credentials;
 
 /// Handle NFS SETATTR procedure (procedure 2)
 ///
@@ -26,6 +27,7 @@ pub async fn handle_setattr(
     xid: u32,
     args_data: &[u8],
     filesystem: &dyn NfsBackend,
+    cred: &Credentials,
 ) -> Result<BytesMut> {
     debug!("NFS SETATTR called (xid={})", xid);
 
@@ -61,6 +63,36 @@ pub async fn handle_setattr(
 
     // Apply attribute changes
     let new_attrs = &args.new_attributes;
+
+    let want_mode = matches!(
+        new_attrs.mode,
+        crate::protocol::v3::nfs::set_mode3::SET_MODE(_)
+    );
+    let want_size = matches!(
+        new_attrs.size,
+        crate::protocol::v3::nfs::set_size3::SET_SIZE(_)
+    );
+    let uid = match &new_attrs.uid {
+        crate::protocol::v3::nfs::set_uid3::SET_UID(u) => Some(*u),
+        _ => None,
+    };
+    let gid = match &new_attrs.gid {
+        crate::protocol::v3::nfs::set_gid3::SET_GID(g) => Some(*g),
+        _ => None,
+    };
+
+    // chmod/chown need ownership (or root), truncate needs write
+    // permission; see `perm::check_setattr` for the exact rules.
+    if let Some(ref before) = before_attrs {
+        let who = super::access_check::identity_for(filesystem, &args.object.0, cred);
+        if let Err(status) =
+            super::perm::check_setattr(before, &who, want_mode, uid, gid, want_size)
+        {
+            debug!("SETATTR denied: {:?}", status);
+            let res_data = NfsMessage::create_setattr_error_response(status)?;
+            return RpcMessage::create_success_reply_with_data(xid, res_data);
+        }
+    }
 
     // Handle size change (truncate/extend)
     if let crate::protocol::v3::nfs::set_size3::SET_SIZE(new_size) = &new_attrs.size {
@@ -101,15 +133,6 @@ pub async fn handle_setattr(
     }
 
     // Handle uid/gid change
-    let uid = match &new_attrs.uid {
-        crate::protocol::v3::nfs::set_uid3::SET_UID(u) => Some(*u),
-        _ => None,
-    };
-    let gid = match &new_attrs.gid {
-        crate::protocol::v3::nfs::set_gid3::SET_GID(g) => Some(*g),
-        _ => None,
-    };
-
     if uid.is_some() || gid.is_some() {
         debug!("SETATTR: setting uid={:?}, gid={:?}", uid, gid);
 
@@ -226,7 +249,7 @@ mod tests {
         args.pack(&mut args_buf).unwrap();
 
         // Call SETATTR
-        let result = handle_setattr(12345, &args_buf, fs.as_ref()).await;
+        let result = handle_setattr(12345, &args_buf, fs.as_ref(), &Credentials::root()).await;
 
         assert!(result.is_ok(), "SETATTR should succeed");
 
@@ -286,7 +309,7 @@ mod tests {
         args.pack(&mut args_buf).unwrap();
 
         // Call SETATTR
-        let result = handle_setattr(12345, &args_buf, fs.as_ref()).await;
+        let result = handle_setattr(12345, &args_buf, fs.as_ref(), &Credentials::root()).await;
 
         assert!(result.is_ok(), "SETATTR should succeed");
     }
